@@ -1,174 +1,61 @@
-# ShareSense Backend API
+# ShareSense
 
-Backend API for the ShareSense expense tracking application.
+A lightweight web app for roommates and groups to track shared expenses and settle debts.
 
-**Repository:** https://github.com/VirajPrateek/share-sense.git
+## Tech Stack
+
+- Python + Flask (backend & UI)
+- SQLite (database, zero setup)
+- JWT authentication
+- Vanilla HTML/CSS/JS frontend served by Flask
+
+## Quick Start
+
+```bash
+# Install dependencies (one time)
+py -m pip install -r py_backend/requirements.txt
+
+# Run the app
+py py_backend/app.py
+```
+
+Open http://localhost:3000 in your browser.
 
 ## Features
 
-- JWT-based authentication
-- User registration and login
-- Secure password hashing with bcrypt
-- PostgreSQL database integration
-
-## Prerequisites
-
-- Node.js (v18 or higher)
-- PostgreSQL (v14 or higher)
-- npm or yarn
-
-## Setup
-
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Create a PostgreSQL database:
-```bash
-createdb sharesense
-```
-
-3. Run the database schema:
-```bash
-psql -d sharesense -f database/schema.sql
-```
-
-4. Create a `.env` file based on `.env.example`:
-```bash
-cp .env.example .env
-```
-
-5. Update the `.env` file with your configuration:
-   - Set your database credentials
-   - Set a secure JWT_SECRET (use a random string)
-
-## Running the Application
-
-Development mode (with auto-reload):
-```bash
-npm run dev
-```
-
-Production mode:
-```bash
-npm start
-```
-
-The server will start on `http://localhost:3000` (or the PORT specified in .env).
+- User registration & login (JWT auth)
+- Create and manage flats/groups
+- Add/remove members
+- Expense tracking (in progress)
+- Settlement management (in progress)
 
 ## API Endpoints
 
-### Authentication
+### Auth
+- `POST /api/auth/register` — Register a new user
+- `POST /api/auth/login` — Login, returns JWT token
+- `GET /api/auth/me` — Get current user profile
+- `POST /api/auth/logout` — Logout
 
-#### Register User
-```
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123",
-  "name": "John Doe"
-}
-```
-
-#### Login
-```
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-Response includes JWT token:
-```json
-{
-  "message": "Login successful",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "John Doe"
-  },
-  "token": "jwt_token_here"
-}
-```
-
-#### Get Current User
-```
-GET /api/auth/me
-Authorization: Bearer <token>
-```
-
-#### Logout
-```
-POST /api/auth/logout
-Authorization: Bearer <token>
-```
-
-### Health Check
-```
-GET /health
-```
-
-## Authentication
-
-Protected endpoints require a JWT token in the Authorization header:
-```
-Authorization: Bearer <your_jwt_token>
-```
+### Flats
+- `POST /api/flats` — Create a flat
+- `GET /api/flats` — List your flats
+- `GET /api/flats/:id` — Get flat details
+- `GET /api/flats/:id/members` — List flat members
+- `POST /api/flats/:id/members` — Add a member
+- `DELETE /api/flats/:id/members/:userId` — Remove a member
 
 ## Project Structure
 
 ```
-.
-├── src/
-│   ├── config/
-│   │   └── database.js       # Database connection
-│   ├── controllers/
-│   │   └── authController.js # Authentication controller
-│   ├── middleware/
-│   │   └── auth.js           # Authentication middleware
-│   ├── routes/
-│   │   └── authRoutes.js     # Authentication routes
-│   ├── services/
-│   │   └── authService.js    # Authentication business logic
-│   ├── app.js                # Express app setup
-│   └── server.js             # Server entry point
-├── database/
-│   └── schema.sql            # Database schema
-├── .env.example              # Environment variables template
-├── .gitignore
-├── package.json
-└── README.md
+py_backend/
+├── app.py              # Flask app + entry point
+├── auth.py             # JWT + password hashing
+├── config.py           # Configuration (env vars)
+├── database.py         # SQLite schema + connection
+├── requirements.txt    # Python dependencies
+├── routes_auth.py      # Auth API routes
+├── routes_flats.py     # Flats API routes
+└── templates/
+    └── base.html       # Single-page UI
 ```
-
-## Error Handling
-
-The API returns consistent error responses:
-
-```json
-{
-  "error": "Error type",
-  "message": "Detailed error message"
-}
-```
-
-Common HTTP status codes:
-- 200: Success
-- 201: Created
-- 400: Bad Request (validation error)
-- 401: Unauthorized (authentication failed)
-- 404: Not Found
-- 409: Conflict (e.g., email already exists)
-- 500: Internal Server Error
-
-## Security
-
-- Passwords are hashed using bcrypt with 10 salt rounds
-- JWT tokens expire after 7 days (configurable)
-- CORS enabled for cross-origin requests
-- Input validation on all endpoints
