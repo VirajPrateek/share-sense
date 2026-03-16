@@ -101,6 +101,7 @@ def delete_expense(flat_id, expense_id):
     return jsonify({"message": "Expense deleted"}), 200
 
 
+
 @bp.route("/<flat_id>/balances", methods=["GET"])
 @login_required
 def get_balances(flat_id):
@@ -114,21 +115,21 @@ def get_balances(flat_id):
         (flat_id,),
     ).fetchall()
 
-    # Calculate: each person's balance = what they paid - what they owe
+    # Calculate net balance per person: paid - owed
     balances = {}
+    names = {}
     for m in members:
-        balances[m["id"]] = {"id": m["id"], "name": m["name"], "balance": 0.0}
+        balances[m["id"]] = 0.0
+        names[m["id"]] = m["name"]
 
-    # Add what each person paid
     paid = db.execute(
         "SELECT payer_id, SUM(amount) as total FROM expenses WHERE flat_id = ? AND expense_type = 'shared' GROUP BY payer_id",
         (flat_id,),
     ).fetchall()
     for p in paid:
         if p["payer_id"] in balances:
-            balances[p["payer_id"]]["balance"] += p["total"]
+            balances[p["payer_id"]] += p["total"]
 
-    # Subtract what each person owes (their shares)
     owed = db.execute(
         """SELECT es.sharer_id, SUM(es.share_amount) as total
            FROM expense_shares es JOIN expenses e ON es.expense_id = e.id
@@ -138,19 +139,52 @@ def get_balances(flat_id):
     ).fetchall()
     for o in owed:
         if o["sharer_id"] in balances:
-            balances[o["sharer_id"]]["balance"] -= o["total"]
+            balances[o["sharer_id"]] -= o["total"]
 
-    # Factor in settlements
-    settlements_paid = db.execute(
+    # Factor in confirmed settlements
+    settlements = db.execute(
         "SELECT debtor_id, creditor_id, amount FROM settlements WHERE flat_id = ? AND status = 'confirmed'",
         (flat_id,),
     ).fetchall()
-    for s in settlements_paid:
+    for s in settlements:
         if s["debtor_id"] in balances:
-            balances[s["debtor_id"]]["balance"] += s["amount"]
+            balances[s["debtor_id"]] += s["amount"]
         if s["creditor_id"] in balances:
-            balances[s["creditor_id"]]["balance"] -= s["amount"]
+            balances[s["creditor_id"]] -= s["amount"]
 
-    result = [{"id": b["id"], "name": b["name"], "balance": round(b["balance"], 2)} for b in balances.values()]
+    # Simplify debts: greedy algorithm to minimize transactions
+    debtors = []  # people who owe (negative balance)
+    creditors = []  # people who are owed (positive balance)
+    for uid, bal in balances.items():
+        bal = round(bal, 2)
+        if bal < 0:
+            debtors.append({"id": uid, "name": names[uid], "amount": -bal})
+        elif bal > 0:
+            creditors.append({"id": uid, "name": names[uid], "amount": bal})
+
+    # Match debtors to creditors
+    transfers = []
+    debtors.sort(key=lambda x: -x["amount"])
+    creditors.sort(key=lambda x: -x["amount"])
+    di, ci = 0, 0
+    while di < len(debtors) and ci < len(creditors):
+        d = debtors[di]
+        c = creditors[ci]
+        amt = round(min(d["amount"], c["amount"]), 2)
+        if amt > 0:
+            transfers.append({
+                "from_id": d["id"], "from_name": d["name"],
+                "to_id": c["id"], "to_name": c["name"],
+                "amount": amt
+            })
+        d["amount"] = round(d["amount"] - amt, 2)
+        c["amount"] = round(c["amount"] - amt, 2)
+        if d["amount"] == 0:
+            di += 1
+        if c["amount"] == 0:
+            ci += 1
+
     db.close()
-    return jsonify({"balances": result}), 200
+    return jsonify({"transfers": transfers}), 200
+
+

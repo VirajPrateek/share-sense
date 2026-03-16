@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShareSense</title>
+    <style>
+        :root { --glass: rgba(255,255,255,0.55); --glass-border: rgba(255,255,255,0.3); --glass-shadow: rgba(0,0,0,0.06); --accent: #6c63ff; --accent-hover: #5a52d5; --text: #1a1a2e; --text-light: #888; --bg: #e8eaf6; --positive: #2e7d5e; --negative: #c0392b; --warn: #e67e22; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); background-image: linear-gradient(135deg, #dfe6fd 0%, #e8eaf6 40%, #f3e8ff 100%); color: var(--text); min-height: 100vh; padding-bottom: 68px; font-size: 13px; }
+        .navbar { background: rgba(108,99,255,0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: white; padding: 0.8rem 1.2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .navbar h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.3px; }
+        .navbar a, .navbar button { color: rgba(255,255,255,0.9); text-decoration: none; background: none; border: none; cursor: pointer; font-size: 0.8rem; padding: 0.3rem 0.6rem; border-radius: 6px; transition: background 0.2s; }
+        .navbar a:hover, .navbar button:hover { background: rgba(255,255,255,0.15); }
+        .container { max-width: 480px; margin: 1rem auto; padding: 0 0.8rem; }
+        .glass { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 16px; padding: 1.2rem; margin-bottom: 0.8rem; box-shadow: 0 4px 24px var(--glass-shadow), inset 0 1px 0 var(--glass-border); border: 1px solid var(--glass-border); }
+        .glass h2 { font-size: 0.85rem; margin-bottom: 0.8rem; color: var(--text); font-weight: 600; letter-spacing: -0.2px; }
+        input, select { width: 100%; padding: 0.55rem 0.8rem; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; font-size: 0.82rem; margin-bottom: 0.6rem; background: rgba(255,255,255,0.6); backdrop-filter: blur(8px); transition: border-color 0.2s; }
+        input:focus, select:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.8); }
+        .btn { display: inline-block; padding: 0.55rem 1.2rem; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; text-decoration: none; text-align: center; width: 100%; font-weight: 500; }
+        .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-outline { background: rgba(108,99,255,0.08); color: var(--accent); border: 1px solid rgba(108,99,255,0.2); }
+        .btn-outline:hover { background: var(--accent); color: white; }
+        .btn-danger { background: rgba(192,57,43,0.1); color: var(--negative); border: 1px solid rgba(192,57,43,0.15); }
+        .btn-danger:hover { background: var(--negative); color: white; }
+        .btn-green { background: rgba(46,125,94,0.1); color: var(--positive); border: 1px solid rgba(46,125,94,0.15); }
+        .btn-green:hover { background: var(--positive); color: white; }
+        .btn-sm { padding: 0.3rem 0.6rem; width: auto; font-size: 0.75rem; }
+        .alert { padding: 0.6rem 0.8rem; border-radius: 10px; margin-bottom: 0.8rem; font-size: 0.8rem; backdrop-filter: blur(8px); }
+        .alert-error { background: rgba(192,57,43,0.1); color: var(--negative); border: 1px solid rgba(192,57,43,0.15); }
+        .alert-success { background: rgba(46,125,94,0.1); color: var(--positive); border: 1px solid rgba(46,125,94,0.15); }
+        .link { color: var(--accent); text-decoration: none; font-size: 0.8rem; }
+        .link:hover { text-decoration: underline; }
+        .text-center { text-align: center; }
+        .mt-1 { margin-top: 0.4rem; }
+        .mt-2 { margin-top: 0.8rem; }
+        .mb-1 { margin-bottom: 0.4rem; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .list-item { padding: 0.6rem 0; border-bottom: 1px solid rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
+        .list-item:last-child { border-bottom: none; }
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.68rem; font-weight: 500; }
+        .badge-default { background: rgba(108,99,255,0.1); color: var(--accent); }
+        .badge-green { background: rgba(46,125,94,0.1); color: var(--positive); }
+        .badge-yellow { background: rgba(230,126,34,0.1); color: var(--warn); }
+        .empty { text-align: center; color: var(--text-light); padding: 1.5rem 0; font-size: 0.8rem; }
+        .balance-positive { color: var(--positive); font-weight: 600; font-size: 0.82rem; }
+        .balance-negative { color: var(--negative); font-weight: 600; font-size: 0.82rem; }
+        .balance-zero { color: var(--text-light); font-size: 0.82rem; }
+
+        .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; padding: 0.4rem 0 0.5rem; z-index: 10; }
+        .footer-nav .nav-item { display: flex; flex-direction: column; align-items: center; padding: 0.2rem 0.6rem; cursor: pointer; color: var(--text-light); font-size: 0.6rem; text-decoration: none; transition: color 0.2s; border: none; background: none; gap: 0.15rem; }
+        .footer-nav .nav-item svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+        .footer-nav .nav-item.active { color: var(--accent); }
+        .footer-nav .nav-item:hover { color: var(--accent); }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1><a href="#dashboard" style="color:white;text-decoration:none">ShareSense</a></h1>
+        <div id="nav-right"></div>
+    </nav>
+    <div class="container" id="app"></div>
+    <div class="footer-nav" id="footer-nav" style="display:none"></div>
+    <script>
+        const API = '';
+        const CUR = '₹';
+        const state = { token: localStorage.getItem('ss_token'), user: JSON.parse(localStorage.getItem('ss_user') || 'null'), currentFlat: null, currentTab: 'balances' };
+
+        function setAuth(t, u) { state.token = t; state.user = u; localStorage.setItem('ss_token', t); localStorage.setItem('ss_user', JSON.stringify(u)); }
+        function clearAuth() { state.token = null; state.user = null; localStorage.removeItem('ss_token'); localStorage.removeItem('ss_user'); }
+
+        async function api(path, opts = {}) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+            const res = await fetch(API + path, { ...opts, headers });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message || 'Request failed');
+            return data;
+        }
+        function showMsg(text, type = 'error') {
+            const app = document.getElementById('app');
+            const ex = document.getElementById('msg-alert');
+            if (ex) ex.remove();
+            const d = document.createElement('div'); d.id = 'msg-alert'; d.className = 'alert alert-' + type; d.textContent = text;
+            app.prepend(d); setTimeout(() => d.remove(), 4000);
+        }
+        function renderNav() {
+            const n = document.getElementById('nav-right');
+            n.innerHTML = state.user ? '<span style="font-size:0.8rem;opacity:0.9">' + state.user.name + '</span> <button onclick="logout()">Logout</button>' : '';
+        }
+
+        // SVG icons (minimalist line style)
+        const icons = {
+            balance: '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M7 8l5-5 5 5M7 16l5 5 5-5"/></svg>',
+            expense: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 16h4"/></svg>',
+            settle: '<svg viewBox="0 0 24 24"><path d="M17 11h4M21 7v8M3 7v8M3 11h4"/><circle cx="12" cy="12" r="4"/><path d="M12 10v4M10 12h4"/></svg>',
+            members: '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><circle cx="17" cy="9" r="2"/><path d="M21 21v-1.5a3 3 0 00-3-3h-.5"/></svg>'
+        };
+
+        function showFooter(flatId, activeTab) {
+            const f = document.getElementById('footer-nav');
+            if (!flatId) { f.style.display = 'none'; return; }
+            state.currentFlat = flatId; state.currentTab = activeTab || 'balances';
+            const tabs = [
+                { id: 'balances', icon: icons.balance, label: 'Balances' },
+                { id: 'expenses', icon: icons.expense, label: 'Expenses' },
+                { id: 'settlements', icon: icons.settle, label: 'Settle' },
+                { id: 'members', icon: icons.members, label: 'Members' }
+            ];
+            f.innerHTML = tabs.map(t =>
+                '<button class="nav-item ' + (t.id === activeTab ? 'active' : '') + '" onclick="switchTab(\'' + flatId + '\',\'' + t.id + '\')">' + t.icon + t.label + '</button>'
+            ).join('');
+            f.style.display = 'flex';
+        }
+        function hideFooter() { document.getElementById('footer-nav').style.display = 'none'; }
+        function switchTab(fid, tab) { flatDetailPage(fid, tab); }
+        async function logout() { clearAuth(); hideFooter(); route(); }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        // --- Auth ---
+        function loginPage() {
+            hideFooter();
+            document.getElementById('app').innerHTML = '<div class="glass mt-2"><h2>Login</h2><form onsubmit="handleLogin(event)"><input type="email" id="l-email" placeholder="Email" required><input type="password" id="l-pass" placeholder="Password" required><button class="btn" type="submit">Login</button></form><p class="text-center mt-1">No account? <a href="#register" class="link">Register</a></p></div>';
+        }
+        async function handleLogin(e) {
+            e.preventDefault();
+            try { const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: document.getElementById('l-email').value, password: document.getElementById('l-pass').value }) }); setAuth(d.token, d.user); location.hash = '#dashboard'; } catch (err) { showMsg(err.message); }
+        }
+        function registerPage() {
+            hideFooter();
+            document.getElementById('app').innerHTML = '<div class="glass mt-2"><h2>Register</h2><form onsubmit="handleRegister(event)"><input type="text" id="r-name" placeholder="Name" required><input type="email" id="r-email" placeholder="Email" required><input type="password" id="r-pass" placeholder="Password (min 6 chars)" required minlength="6"><button class="btn" type="submit">Register</button></form><p class="text-center mt-1">Have an account? <a href="#login" class="link">Login</a></p></div>';
+        }
+        async function handleRegister(e) {
+            e.preventDefault();
+            try { await api('/api/auth/register', { method: 'POST', body: JSON.stringify({ name: document.getElementById('r-name').value, email: document.getElementById('r-email').value, password: document.getElementById('r-pass').value }) }); showMsg('Registered! Please login.', 'success'); location.hash = '#login'; } catch (err) { showMsg(err.message); }
+        }
+
+        // --- Dashboard ---
+        async function dashboardPage() {
+            hideFooter();
+            const app = document.getElementById('app');
+            app.innerHTML = '<div class="glass"><p class="empty">Loading...</p></div>';
+            try {
+                const data = await api('/api/flats');
+                let h = '<div class="glass"><div class="flex-between mb-1"><h2>My Flats</h2><button class="btn btn-sm" onclick="location.hash=\'#new-flat\'">+ New</button></div>';
+                if (data.flats.length === 0) { h += '<p class="empty">No flats yet. Create one!</p>'; }
+                else { data.flats.forEach(f => { h += '<div class="list-item"><div><strong>' + esc(f.name) + '</strong><br><small style="color:var(--text-light)">' + new Date(f.created_at).toLocaleDateString() + '</small></div><a href="#flat/' + f.id + '" class="btn btn-sm btn-outline">View</a></div>'; }); }
+                h += '</div>'; app.innerHTML = h;
+            } catch (err) { showMsg(err.message); }
+        }
+        function newFlatPage() {
+            hideFooter();
+            document.getElementById('app').innerHTML = '<div class="glass"><h2>Create New Flat</h2><form onsubmit="handleCreateFlat(event)"><input type="text" id="f-name" placeholder="Flat name (e.g. Flat 101)" required><button class="btn" type="submit">Create</button></form><p class="mt-1"><a href="#dashboard" class="link">&larr; Back</a></p></div>';
+        }
+        async function handleCreateFlat(e) {
+            e.preventDefault();
+            try { await api('/api/flats', { method: 'POST', body: JSON.stringify({ name: document.getElementById('f-name').value }) }); showMsg('Flat created!', 'success'); location.hash = '#dashboard'; } catch (err) { showMsg(err.message); }
+        }
+
+        // --- Flat Detail ---
+        let flatCache = {};
+        async function flatDetailPage(fid, tab) {
+            tab = tab || 'balances';
+            const app = document.getElementById('app');
+            app.innerHTML = '<div class="glass"><p class="empty">Loading...</p></div>';
+            try {
+                const [fd, md] = await Promise.all([api('/api/flats/' + fid), api('/api/flats/' + fid + '/members')]);
+                flatCache = { flat: fd.flat, members: md.members, flatId: fid };
+                let h = '<div class="glass"><div class="flex-between mb-1"><h2>' + esc(fd.flat.name) + '</h2><a href="#dashboard" class="link">&larr; Flats</a></div>';
+                h += '<div id="tab-content"></div></div>';
+                app.innerHTML = h;
+                showFooter(fid, tab);
+                if (tab === 'balances') renderBalances(fid);
+                else if (tab === 'expenses') renderExpenses(fid);
+                else if (tab === 'settlements') renderSettlements(fid);
+                else if (tab === 'members') renderMembers(fid);
+            } catch (err) { showMsg(err.message); }
+        }
+
+        // --- Balances ---
+        async function renderBalances(fid) {
+            const el = document.getElementById('tab-content');
+            try {
+                const d = await api('/api/flats/' + fid + '/balances');
+                let h = '<h2 class="mb-1">Who pays whom</h2>';
+                if (d.transfers.length === 0) { h += '<p class="empty">All settled up!</p>'; }
+                else {
+                    d.transfers.forEach(t => {
+                        h += '<div class="list-item"><div><strong>' + esc(t.from_name) + '</strong> pays <strong>' + esc(t.to_name) + '</strong></div><span class="balance-negative">' + CUR + t.amount.toFixed(2) + '</span></div>';
+                    });
+                }
+                el.innerHTML = h;
+            } catch (err) { el.innerHTML = '<p class="empty">Error loading balances</p>'; }
+        }
+
+        // --- Expenses ---
+        async function renderExpenses(fid) {
+            const el = document.getElementById('tab-content');
+            try {
+                const d = await api('/api/flats/' + fid + '/expenses');
+                const m = flatCache.members || [];
+                let h = '<h2 class="mb-1">Add Expense</h2><form onsubmit="handleAddExpense(event,\'' + fid + '\')">';
+                h += '<input type="text" id="e-desc" placeholder="Description" required>';
+                h += '<input type="number" id="e-amount" placeholder="Amount (' + CUR + ')" step="0.01" min="0.01" required>';
+                h += '<select id="e-payer">';
+                m.forEach(x => { h += '<option value="' + x.id + '"' + (x.id === state.user.id ? ' selected' : '') + '>' + esc(x.name) + (x.id === state.user.id ? ' (You)' : '') + '</option>'; });
+                h += '</select><button class="btn" type="submit">Add</button></form>';
+                h += '<h2 class="mt-2 mb-1">History</h2>';
+                if (d.expenses.length === 0) { h += '<p class="empty">No expenses yet</p>'; }
+                else {
+                    d.expenses.forEach(e => {
+                        h += '<div class="list-item"><div><strong>' + esc(e.description) + '</strong><br><small style="color:var(--text-light)">' + esc(e.payer_name) + ' &middot; ' + new Date(e.timestamp).toLocaleDateString() + '</small></div><div style="text-align:right"><strong>' + CUR + parseFloat(e.amount).toFixed(2) + '</strong><br><button class="btn btn-sm btn-danger mt-1" onclick="deleteExpense(\'' + fid + '\',\'' + e.id + '\')">&#215;</button></div></div>';
+                    });
+                }
+                el.innerHTML = h;
+            } catch (err) { el.innerHTML = '<p class="empty">Error loading expenses</p>'; }
+        }
+        async function handleAddExpense(e, fid) {
+            e.preventDefault();
+            try { await api('/api/flats/' + fid + '/expenses', { method: 'POST', body: JSON.stringify({ description: document.getElementById('e-desc').value, amount: parseFloat(document.getElementById('e-amount').value), payerId: document.getElementById('e-payer').value }) }); showMsg('Expense added!', 'success'); flatDetailPage(fid, 'expenses'); } catch (err) { showMsg(err.message); }
+        }
+        async function deleteExpense(fid, eid) {
+            if (!confirm('Delete this expense?')) return;
+            try { await api('/api/flats/' + fid + '/expenses/' + eid, { method: 'DELETE' }); showMsg('Deleted', 'success'); flatDetailPage(fid, 'expenses'); } catch (err) { showMsg(err.message); }
+        }
+
+        // --- Settlements ---
+        async function renderSettlements(fid) {
+            const el = document.getElementById('tab-content');
+            try {
+                const d = await api('/api/flats/' + fid + '/settlements');
+                const m = flatCache.members || [];
+                let h = '<h2 class="mb-1">Record Payment</h2><form onsubmit="handleSettle(event,\'' + fid + '\')">';
+                h += '<select id="s-debtor"><option value="">Who paid?</option>';
+                m.forEach(x => { h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
+                h += '</select><select id="s-creditor"><option value="">Paid to?</option>';
+                m.forEach(x => { h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
+                h += '</select><input type="number" id="s-amount" placeholder="Amount (' + CUR + ')" step="0.01" min="0.01" required>';
+                h += '<button class="btn" type="submit">Propose</button></form>';
+                h += '<h2 class="mt-2 mb-1">History</h2>';
+                if (d.settlements.length === 0) { h += '<p class="empty">No settlements yet</p>'; }
+                else {
+                    d.settlements.forEach(s => {
+                        let badge = s.status === 'confirmed' ? '<span class="badge badge-green">Confirmed</span>' : '<span class="badge badge-yellow">Pending</span>';
+                        h += '<div class="list-item"><div><strong>' + esc(s.debtor_name) + ' &rarr; ' + esc(s.creditor_name) + '</strong><br><small style="color:var(--text-light)">' + CUR + parseFloat(s.amount).toFixed(2) + ' &middot; ' + new Date(s.created_at).toLocaleDateString() + '</small></div><div style="text-align:right">' + badge;
+                        if (s.status === 'pending') { h += '<br><button class="btn btn-sm btn-green mt-1" onclick="confirmSettlement(\'' + fid + '\',\'' + s.id + '\')">Confirm</button>'; }
+                        h += '</div></div>';
+                    });
+                }
+                el.innerHTML = h;
+            } catch (err) { el.innerHTML = '<p class="empty">Error loading settlements</p>'; }
+        }
+        async function handleSettle(e, fid) {
+            e.preventDefault();
+            const a = document.getElementById('s-debtor').value, b = document.getElementById('s-creditor').value;
+            if (!a || !b) { showMsg('Select both parties'); return; }
+            if (a === b) { showMsg('Must be different people'); return; }
+            try { await api('/api/flats/' + fid + '/settlements', { method: 'POST', body: JSON.stringify({ debtorId: a, creditorId: b, amount: parseFloat(document.getElementById('s-amount').value) }) }); showMsg('Settlement proposed!', 'success'); flatDetailPage(fid, 'settlements'); } catch (err) { showMsg(err.message); }
+        }
+        async function confirmSettlement(fid, sid) {
+            try { await api('/api/flats/' + fid + '/settlements/' + sid + '/confirm', { method: 'POST' }); showMsg('Confirmed!', 'success'); flatDetailPage(fid, 'settlements'); } catch (err) { showMsg(err.message); }
+        }
+
+        // --- Members ---
+        function renderMembers(fid) {
+            const m = flatCache.members || [];
+            let h = '<h2 class="mb-1">Members (' + m.length + ')</h2>';
+            m.forEach(x => {
+                h += '<div class="list-item"><div><strong>' + esc(x.name) + '</strong><br><small style="color:var(--text-light)">' + esc(x.email) + '</small></div>';
+                if (x.id !== state.user.id) { h += '<button class="btn btn-sm btn-danger" onclick="removeMember(\'' + fid + '\',\'' + x.id + '\')">Remove</button>'; }
+                else { h += '<span class="badge badge-default">You</span>'; }
+                h += '</div>';
+            });
+            h += '<h2 class="mt-2 mb-1">Add Member</h2>';
+            h += '<form onsubmit="handleAddMember(event,\'' + fid + '\')"><input type="email" id="add-email" placeholder="Email address"><button class="btn btn-sm" type="submit">Add</button></form>';
+            document.getElementById('tab-content').innerHTML = h;
+        }
+        async function handleAddMember(e, fid) {
+            e.preventDefault();
+            try { await api('/api/flats/' + fid + '/members', { method: 'POST', body: JSON.stringify({ email: document.getElementById('add-email').value }) }); showMsg('Member added!', 'success'); flatDetailPage(fid, 'members'); } catch (err) { showMsg(err.message); }
+        }
+        async function removeMember(fid, uid) {
+            if (!confirm('Remove this member?')) return;
+            try { await api('/api/flats/' + fid + '/members/' + uid, { method: 'DELETE' }); showMsg('Removed', 'success'); flatDetailPage(fid, 'members'); } catch (err) { showMsg(err.message); }
+        }
+
+        // --- Router ---
+        function route() {
+            renderNav();
+            const hash = location.hash.slice(1) || '';
+            if (!state.token) { hideFooter(); return hash === 'register' ? registerPage() : loginPage(); }
+            if (hash === 'dashboard' || hash === '') return dashboardPage();
+            if (hash === 'new-flat') return newFlatPage();
+            if (hash.startsWith('flat/')) return flatDetailPage(hash.split('/')[1]);
+            dashboardPage();
+        }
+        window.addEventListener('hashchange', route);
+        route();
+    </script>
+</body>
+</html>

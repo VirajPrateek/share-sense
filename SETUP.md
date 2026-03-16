@@ -11,7 +11,7 @@ That's it. No Node.js, no PostgreSQL, no extra services.
 ### 1. Install dependencies
 
 ```bash
-py -m pip install -r py_backend/requirements.txt
+py -m pip install -r sharesense/requirements.txt
 ```
 
 This installs Flask, PyJWT, and Flask-CORS.
@@ -19,7 +19,7 @@ This installs Flask, PyJWT, and Flask-CORS.
 ### 2. Run the app
 
 ```bash
-py py_backend/app.py
+py sharesense/app.py
 ```
 
 The SQLite database (`sharesense.db`) is created automatically on first run.
@@ -48,14 +48,14 @@ Set environment variables to override defaults:
 Set a different port:
 ```bash
 set PORT=3001
-py py_backend/app.py
+py sharesense/app.py
 ```
 
 ### Module not found errors
 
 Make sure you installed dependencies:
 ```bash
-py -m pip install -r py_backend/requirements.txt
+py -m pip install -r sharesense/requirements.txt
 ```
 
 ### Database issues

@@ -13,10 +13,10 @@ A lightweight web app for roommates and groups to track shared expenses and sett
 
 ```bash
 # Install dependencies (one time)
-py -m pip install -r py_backend/requirements.txt
+py -m pip install -r sharesense/requirements.txt
 
 # Run the app
-py py_backend/app.py
+py sharesense/app.py
 ```
 
 Open http://localhost:3000 in your browser.
@@ -48,14 +48,16 @@ Open http://localhost:3000 in your browser.
 ## Project Structure
 
 ```
-py_backend/
+sharesense/
 ├── app.py              # Flask app + entry point
 ├── auth.py             # JWT + password hashing
 ├── config.py           # Configuration (env vars)
 ├── database.py         # SQLite schema + connection
 ├── requirements.txt    # Python dependencies
 ├── routes_auth.py      # Auth API routes
+├── routes_expenses.py  # Expenses + balances API routes
 ├── routes_flats.py     # Flats API routes
+├── routes_settlements.py # Settlements API routes
 └── templates/
     └── base.html       # Single-page UI
 ```
