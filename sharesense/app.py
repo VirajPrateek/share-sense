@@ -4,7 +4,7 @@ from flask_cors import CORS
 from datetime import datetime, timezone
 
 import config
-from database import init_db
+from database import init_db, get_db
 import routes_auth
 import routes_flats
 import routes_expenses
@@ -29,7 +29,20 @@ def create_app():
 
     @app.route("/health")
     def health():
-        return jsonify({"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()})
+        # Test DB connection too
+        db_status = "unknown"
+        try:
+            db = get_db()
+            db.execute("SELECT 1")
+            db.close()
+            db_status = "connected"
+        except Exception as e:
+            db_status = f"error: {e}"
+        return jsonify({
+            "status": "ok",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "database": db_status,
+        })
 
     @app.errorhandler(404)
     def not_found(e):
@@ -37,7 +50,7 @@ def create_app():
 
     @app.errorhandler(500)
     def server_error(e):
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": "Internal server error", "detail": str(e)}), 500
 
     return app
 
