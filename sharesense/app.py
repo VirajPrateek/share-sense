@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 from datetime import datetime, timezone
@@ -9,9 +10,12 @@ import routes_flats
 import routes_expenses
 import routes_settlements
 
+# Resolve template dir relative to this file (works on Vercel too)
+_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder=os.path.join(_dir, "templates"))
     CORS(app)
 
     app.register_blueprint(routes_auth.bp)

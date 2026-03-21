@@ -37,7 +37,12 @@ class _SqliteConn:
 class _PgConn:
     """Wrapper around psycopg2 to match the same interface."""
     def __init__(self):
-        self._conn = psycopg2.connect(config.DATABASE_URL)
+        db_url = config.DATABASE_URL
+        # Supabase requires SSL
+        if "sslmode" not in db_url:
+            sep = "&" if "?" in db_url else "?"
+            db_url += sep + "sslmode=require"
+        self._conn = psycopg2.connect(db_url)
         self._conn.autocommit = False
 
     def execute(self, sql, params=None):
