@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify
 
 from auth import login_required, dict_row
 from database import get_db
+import config
 
 bp = Blueprint("settlements", __name__, url_prefix="/api/flats")
 
@@ -102,9 +104,10 @@ def confirm_settlement(flat_id, settlement_id):
     ).fetchone()
 
     if debtor_confirmed and creditor_confirmed:
+        now_val = datetime.now(timezone.utc).isoformat()
         db.execute(
-            "UPDATE settlements SET status = 'confirmed', confirmed_at = datetime('now') WHERE id = ?",
-            (settlement_id,),
+            "UPDATE settlements SET status = 'confirmed', confirmed_at = ? WHERE id = ?",
+            (now_val, settlement_id),
         )
 
     db.commit()
