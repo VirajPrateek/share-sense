@@ -4,298 +4,747 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ShareSense</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    brand: '#006A6A', 'brand-light': '#e0f2f1', 'brand-container': '#004f4f',
+                    surface: '#f6faf8', 'surface-low': '#f0f4f2', 'surface-card': '#ffffff',
+                    'on-surface': '#181d1c', 'on-surface-light': '#6e7979',
+                    danger: '#ba1a1a', 'danger-bg': 'rgba(186,26,26,0.08)',
+                    'success-bg': 'rgba(0,106,106,0.06)',
+                },
+                fontFamily: { headline: ['Manrope','sans-serif'], body: ['Inter','sans-serif'] },
+            }
+        }
+    }
+    </script>
     <style>
-        :root { --glass: rgba(255,255,255,0.55); --glass-border: rgba(255,255,255,0.3); --glass-shadow: rgba(0,0,0,0.06); --accent: #6c63ff; --accent-hover: #5a52d5; --text: #1a1a2e; --text-light: #888; --bg: #e8eaf6; --positive: #2e7d5e; --negative: #c0392b; --warn: #e67e22; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); background-image: linear-gradient(135deg, #dfe6fd 0%, #e8eaf6 40%, #f3e8ff 100%); color: var(--text); min-height: 100vh; padding-bottom: 68px; font-size: 13px; }
-        .navbar { background: rgba(108,99,255,0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: white; padding: 0.8rem 1.2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.2); }
-        .navbar h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.3px; }
-        .navbar a, .navbar button { color: rgba(255,255,255,0.9); text-decoration: none; background: none; border: none; cursor: pointer; font-size: 0.8rem; padding: 0.3rem 0.6rem; border-radius: 6px; transition: background 0.2s; }
-        .navbar a:hover, .navbar button:hover { background: rgba(255,255,255,0.15); }
-        .container { max-width: 480px; margin: 1rem auto; padding: 0 0.8rem; }
-        .glass { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 16px; padding: 1.2rem; margin-bottom: 0.8rem; box-shadow: 0 4px 24px var(--glass-shadow), inset 0 1px 0 var(--glass-border); border: 1px solid var(--glass-border); }
-        .glass h2 { font-size: 0.85rem; margin-bottom: 0.8rem; color: var(--text); font-weight: 600; letter-spacing: -0.2px; }
-        input, select { width: 100%; padding: 0.55rem 0.8rem; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; font-size: 0.82rem; margin-bottom: 0.6rem; background: rgba(255,255,255,0.6); backdrop-filter: blur(8px); transition: border-color 0.2s; }
-        input:focus, select:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.8); }
-        .btn { display: inline-block; padding: 0.55rem 1.2rem; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; text-decoration: none; text-align: center; width: 100%; font-weight: 500; }
-        .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
-        .btn-outline { background: rgba(108,99,255,0.08); color: var(--accent); border: 1px solid rgba(108,99,255,0.2); }
-        .btn-outline:hover { background: var(--accent); color: white; }
-        .btn-danger { background: rgba(192,57,43,0.1); color: var(--negative); border: 1px solid rgba(192,57,43,0.15); }
-        .btn-danger:hover { background: var(--negative); color: white; }
-        .btn-green { background: rgba(46,125,94,0.1); color: var(--positive); border: 1px solid rgba(46,125,94,0.15); }
-        .btn-green:hover { background: var(--positive); color: white; }
-        .btn-sm { padding: 0.3rem 0.6rem; width: auto; font-size: 0.75rem; }
-        .alert { padding: 0.6rem 0.8rem; border-radius: 10px; margin-bottom: 0.8rem; font-size: 0.8rem; backdrop-filter: blur(8px); }
-        .alert-error { background: rgba(192,57,43,0.1); color: var(--negative); border: 1px solid rgba(192,57,43,0.15); }
-        .alert-success { background: rgba(46,125,94,0.1); color: var(--positive); border: 1px solid rgba(46,125,94,0.15); }
-        .link { color: var(--accent); text-decoration: none; font-size: 0.8rem; }
-        .link:hover { text-decoration: underline; }
-        .text-center { text-align: center; }
-        .mt-1 { margin-top: 0.4rem; }
-        .mt-2 { margin-top: 0.8rem; }
-        .mb-1 { margin-bottom: 0.4rem; }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        .list-item { padding: 0.6rem 0; border-bottom: 1px solid rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
-        .list-item:last-child { border-bottom: none; }
-        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.68rem; font-weight: 500; }
-        .badge-default { background: rgba(108,99,255,0.1); color: var(--accent); }
-        .badge-green { background: rgba(46,125,94,0.1); color: var(--positive); }
-        .badge-yellow { background: rgba(230,126,34,0.1); color: var(--warn); }
-        .empty { text-align: center; color: var(--text-light); padding: 1.5rem 0; font-size: 0.8rem; }
-        .balance-positive { color: var(--positive); font-weight: 600; font-size: 0.82rem; }
-        .balance-negative { color: var(--negative); font-weight: 600; font-size: 0.82rem; }
-        .balance-zero { color: var(--text-light); font-size: 0.82rem; }
-
-        .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); display: flex; justify-content: space-around; padding: 0.4rem 0 0.5rem; z-index: 10; }
-        .footer-nav .nav-item { display: flex; flex-direction: column; align-items: center; padding: 0.2rem 0.6rem; cursor: pointer; color: var(--text-light); font-size: 0.6rem; text-decoration: none; transition: color 0.2s; border: none; background: none; gap: 0.15rem; }
-        .footer-nav .nav-item svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-        .footer-nav .nav-item.active { color: var(--accent); }
-        .footer-nav .nav-item:hover { color: var(--accent); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .mso-fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { min-height: 100dvh; }
     </style>
 </head>
-<body>
-    <nav class="navbar">
-        <h1><a href="#dashboard" style="color:white;text-decoration:none">ShareSense</a></h1>
-        <div id="nav-right"></div>
-    </nav>
-    <div class="container" id="app"></div>
-    <div class="footer-nav" id="footer-nav" style="display:none"></div>
-    <script>
-        const API = '';
-        const CUR = '₹';
-        const state = { token: localStorage.getItem('ss_token'), user: JSON.parse(localStorage.getItem('ss_user') || 'null'), currentFlat: null, currentTab: 'balances' };
+<body class="bg-surface text-on-surface font-body">
 
-        function setAuth(t, u) { state.token = t; state.user = u; localStorage.setItem('ss_token', t); localStorage.setItem('ss_user', JSON.stringify(u)); }
-        function clearAuth() { state.token = null; state.user = null; localStorage.removeItem('ss_token'); localStorage.removeItem('ss_user'); }
+<!-- Top Bar -->
+<header id="topbar" class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-[0_4px_20px_rgba(24,29,28,0.04)]" style="display:none">
+    <div class="flex items-center justify-between px-5 h-14 max-w-lg mx-auto">
+        <button onclick="location.hash='#dashboard'" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors">
+            <span class="material-symbols-outlined text-brand" id="topbar-left-icon">home_work</span>
+        </button>
+        <h1 class="font-headline lowercase text-base tracking-tight font-bold text-brand">sharesense</h1>
+        <button onclick="logout()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors">
+            <span class="material-symbols-outlined text-brand text-[20px]">logout</span>
+        </button>
+    </div>
+</header>
 
-        async function api(path, opts = {}) {
-            const headers = { 'Content-Type': 'application/json' };
-            if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
-            const res = await fetch(API + path, { ...opts, headers });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.message || 'Request failed');
-            return data;
-        }
-        function showMsg(text, type = 'error') {
-            const app = document.getElementById('app');
-            const ex = document.getElementById('msg-alert');
-            if (ex) ex.remove();
-            const d = document.createElement('div'); d.id = 'msg-alert'; d.className = 'alert alert-' + type; d.textContent = text;
-            app.prepend(d); setTimeout(() => d.remove(), 4000);
-        }
-        function renderNav() {
-            const n = document.getElementById('nav-right');
-            n.innerHTML = state.user ? '<span style="font-size:0.8rem;opacity:0.9">' + state.user.name + '</span> <button onclick="logout()">Logout</button>' : '';
-        }
+<!-- Main Content -->
+<main id="app" class="pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6"></main>
 
-        // SVG icons (minimalist line style)
-        const icons = {
-            balance: '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M7 8l5-5 5 5M7 16l5 5 5-5"/></svg>',
-            expense: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 16h4"/></svg>',
-            settle: '<svg viewBox="0 0 24 24"><path d="M17 11h4M21 7v8M3 7v8M3 11h4"/><circle cx="12" cy="12" r="4"/><path d="M12 10v4M10 12h4"/></svg>',
-            members: '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><circle cx="17" cy="9" r="2"/><path d="M21 21v-1.5a3 3 0 00-3-3h-.5"/></svg>'
-        };
+<!-- Bottom Nav -->
+<nav id="footer-nav" class="fixed bottom-0 w-full z-50 rounded-t-2xl bg-white/70 backdrop-blur-xl shadow-[0_-10px_40px_rgba(24,29,28,0.06)]" style="display:none">
+    <div class="flex justify-around items-center max-w-lg mx-auto px-4 pt-2 pb-3 h-[68px]"></div>
+</nav>
 
-        function showFooter(flatId, activeTab) {
-            const f = document.getElementById('footer-nav');
-            if (!flatId) { f.style.display = 'none'; return; }
-            state.currentFlat = flatId; state.currentTab = activeTab || 'balances';
-            const tabs = [
-                { id: 'balances', icon: icons.balance, label: 'Balances' },
-                { id: 'expenses', icon: icons.expense, label: 'Expenses' },
-                { id: 'settlements', icon: icons.settle, label: 'Settle' },
-                { id: 'members', icon: icons.members, label: 'Members' }
-            ];
-            f.innerHTML = tabs.map(t =>
-                '<button class="nav-item ' + (t.id === activeTab ? 'active' : '') + '" onclick="switchTab(\'' + flatId + '\',\'' + t.id + '\')">' + t.icon + t.label + '</button>'
-            ).join('');
-            f.style.display = 'flex';
-        }
-        function hideFooter() { document.getElementById('footer-nav').style.display = 'none'; }
-        function switchTab(fid, tab) { flatDetailPage(fid, tab); }
-        async function logout() { clearAuth(); hideFooter(); route(); }
-        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+<script>
+const API = '', CUR = '₹';
+const S = { token: localStorage.getItem('ss_token'), user: JSON.parse(localStorage.getItem('ss_user')||'null'), flatId: null, tab: 'ledger' };
+let flatCache = {};
 
-        // --- Auth ---
-        function loginPage() {
-            hideFooter();
-            document.getElementById('app').innerHTML = '<div class="glass mt-2"><h2>Login</h2><form onsubmit="handleLogin(event)"><input type="email" id="l-email" placeholder="Email" required><input type="password" id="l-pass" placeholder="Password" required><button class="btn" type="submit">Login</button></form><p class="text-center mt-1">No account? <a href="#register" class="link">Register</a></p></div>';
-        }
-        async function handleLogin(e) {
-            e.preventDefault();
-            try { const d = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: document.getElementById('l-email').value, password: document.getElementById('l-pass').value }) }); setAuth(d.token, d.user); location.hash = '#dashboard'; } catch (err) { showMsg(err.message); }
-        }
-        function registerPage() {
-            hideFooter();
-            document.getElementById('app').innerHTML = '<div class="glass mt-2"><h2>Register</h2><form onsubmit="handleRegister(event)"><input type="text" id="r-name" placeholder="Name" required><input type="email" id="r-email" placeholder="Email" required><input type="password" id="r-pass" placeholder="Password (min 6 chars)" required minlength="6"><button class="btn" type="submit">Register</button></form><p class="text-center mt-1">Have an account? <a href="#login" class="link">Login</a></p></div>';
-        }
-        async function handleRegister(e) {
-            e.preventDefault();
-            try { await api('/api/auth/register', { method: 'POST', body: JSON.stringify({ name: document.getElementById('r-name').value, email: document.getElementById('r-email').value, password: document.getElementById('r-pass').value }) }); showMsg('Registered! Please login.', 'success'); location.hash = '#login'; } catch (err) { showMsg(err.message); }
-        }
+function setAuth(t,u){ S.token=t; S.user=u; localStorage.setItem('ss_token',t); localStorage.setItem('ss_user',JSON.stringify(u)); }
+function clearAuth(){ S.token=null; S.user=null; localStorage.removeItem('ss_token'); localStorage.removeItem('ss_user'); }
+async function api(p,o={}){ const h={'Content-Type':'application/json'}; if(S.token) h['Authorization']='Bearer '+S.token; const r=await fetch(API+p,{...o,headers:h}); const d=await r.json(); if(!r.ok) throw new Error(d.error||d.message||'Failed'); return d; }
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+async function logout(){ clearAuth(); hideChrome(); route(); }
 
-        // --- Dashboard ---
-        async function dashboardPage() {
-            hideFooter();
-            const app = document.getElementById('app');
-            app.innerHTML = '<div class="glass"><p class="empty">Loading...</p></div>';
-            try {
-                const data = await api('/api/flats');
-                let h = '<div class="glass"><div class="flex-between mb-1"><h2>My Flats</h2><button class="btn btn-sm" onclick="location.hash=\'#new-flat\'">+ New</button></div>';
-                if (data.flats.length === 0) { h += '<p class="empty">No flats yet. Create one!</p>'; }
-                else { data.flats.forEach(f => { h += '<div class="list-item"><div><strong>' + esc(f.name) + '</strong><br><small style="color:var(--text-light)">' + new Date(f.created_at).toLocaleDateString() + '</small></div><a href="#flat/' + f.id + '" class="btn btn-sm btn-outline">View</a></div>'; }); }
-                h += '</div>'; app.innerHTML = h;
-            } catch (err) { showMsg(err.message); }
-        }
-        function newFlatPage() {
-            hideFooter();
-            document.getElementById('app').innerHTML = '<div class="glass"><h2>Create New Flat</h2><form onsubmit="handleCreateFlat(event)"><input type="text" id="f-name" placeholder="Flat name (e.g. Flat 101)" required><button class="btn" type="submit">Create</button></form><p class="mt-1"><a href="#dashboard" class="link">&larr; Back</a></p></div>';
-        }
-        async function handleCreateFlat(e) {
-            e.preventDefault();
-            try { await api('/api/flats', { method: 'POST', body: JSON.stringify({ name: document.getElementById('f-name').value }) }); showMsg('Flat created!', 'success'); location.hash = '#dashboard'; } catch (err) { showMsg(err.message); }
-        }
+function showChrome(){ document.getElementById('topbar').style.display=''; }
+function hideChrome(){ document.getElementById('topbar').style.display='none'; document.getElementById('footer-nav').style.display='none'; }
 
-        // --- Flat Detail ---
-        let flatCache = {};
-        async function flatDetailPage(fid, tab) {
-            tab = tab || 'balances';
-            const app = document.getElementById('app');
-            app.innerHTML = '<div class="glass"><p class="empty">Loading...</p></div>';
-            try {
-                const [fd, md] = await Promise.all([api('/api/flats/' + fid), api('/api/flats/' + fid + '/members')]);
-                flatCache = { flat: fd.flat, members: md.members, flatId: fid };
-                let h = '<div class="glass"><div class="flex-between mb-1"><h2>' + esc(fd.flat.name) + '</h2><a href="#dashboard" class="link">&larr; Flats</a></div>';
-                h += '<div id="tab-content"></div></div>';
-                app.innerHTML = h;
-                showFooter(fid, tab);
-                if (tab === 'balances') renderBalances(fid);
-                else if (tab === 'expenses') renderExpenses(fid);
-                else if (tab === 'settlements') renderSettlements(fid);
-                else if (tab === 'members') renderMembers(fid);
-            } catch (err) { showMsg(err.message); }
-        }
+function showMsg(text, type='error'){
+    const ex=document.getElementById('toast'); if(ex) ex.remove();
+    const cls = type==='success' ? 'bg-brand text-white' : 'bg-danger text-white';
+    const d=document.createElement('div'); d.id='toast';
+    d.className='fixed top-16 left-1/2 -translate-x-1/2 z-[99] px-4 py-2 rounded-lg text-xs font-medium shadow-lg '+cls;
+    d.textContent=text; document.body.appendChild(d); setTimeout(()=>d.remove(),3000);
+}
 
-        // --- Balances ---
-        async function renderBalances(fid) {
-            const el = document.getElementById('tab-content');
-            try {
-                const d = await api('/api/flats/' + fid + '/balances');
-                let h = '<h2 class="mb-1">Who pays whom</h2>';
-                if (d.transfers.length === 0) { h += '<p class="empty">All settled up!</p>'; }
-                else {
-                    d.transfers.forEach(t => {
-                        h += '<div class="list-item"><div><strong>' + esc(t.from_name) + '</strong> pays <strong>' + esc(t.to_name) + '</strong></div><span class="balance-negative">' + CUR + t.amount.toFixed(2) + '</span></div>';
-                    });
-                }
-                el.innerHTML = h;
-            } catch (err) { el.innerHTML = '<p class="empty">Error loading balances</p>'; }
-        }
+function showFooter(flatId, tab){
+    S.flatId=flatId; S.tab=tab||'ledger';
+    const nav=document.getElementById('footer-nav');
+    const tabs=[
+        {id:'ledger',icon:'account_balance_wallet',label:'ledger'},
+        {id:'expenses',icon:'receipt_long',label:'split'},
+        {id:'settlements',icon:'handshake',label:'settle'},
+        {id:'members',icon:'home_work',label:'house'}
+    ];
+    const inner=nav.querySelector('div');
+    inner.innerHTML=tabs.map(t=>{
+        const active=t.id===S.tab;
+        const cls=active?'text-brand bg-brand-light rounded-xl px-4 py-1.5':'text-on-surface-light px-4 py-1.5 hover:text-brand';
+        const fill=active?'mso-fill':'';
+        return '<a class="flex flex-col items-center justify-center '+cls+' active:scale-90 transition-transform duration-150 cursor-pointer" onclick="switchTab(\''+flatId+'\',\''+t.id+'\')"><span class="material-symbols-outlined '+fill+'">'+t.icon+'</span><span class="font-body text-[10px] font-medium tracking-wide">'+t.label+'</span></a>';
+    }).join('');
+    nav.style.display='';
+}
+function switchTab(fid,tab){ flatDetailPage(fid,tab); }
 
-        // --- Expenses ---
-        async function renderExpenses(fid) {
-            const el = document.getElementById('tab-content');
-            try {
-                const d = await api('/api/flats/' + fid + '/expenses');
-                const m = flatCache.members || [];
-                let h = '<h2 class="mb-1">Add Expense</h2><form onsubmit="handleAddExpense(event,\'' + fid + '\')">';
-                h += '<input type="text" id="e-desc" placeholder="Description" required>';
-                h += '<input type="number" id="e-amount" placeholder="Amount (' + CUR + ')" step="0.01" min="0.01" required>';
-                h += '<select id="e-payer">';
-                m.forEach(x => { h += '<option value="' + x.id + '"' + (x.id === state.user.id ? ' selected' : '') + '>' + esc(x.name) + (x.id === state.user.id ? ' (You)' : '') + '</option>'; });
-                h += '</select><button class="btn" type="submit">Add</button></form>';
-                h += '<h2 class="mt-2 mb-1">History</h2>';
-                if (d.expenses.length === 0) { h += '<p class="empty">No expenses yet</p>'; }
-                else {
-                    d.expenses.forEach(e => {
-                        h += '<div class="list-item"><div><strong>' + esc(e.description) + '</strong><br><small style="color:var(--text-light)">' + esc(e.payer_name) + ' &middot; ' + new Date(e.timestamp).toLocaleDateString() + '</small></div><div style="text-align:right"><strong>' + CUR + parseFloat(e.amount).toFixed(2) + '</strong><br><button class="btn btn-sm btn-danger mt-1" onclick="deleteExpense(\'' + fid + '\',\'' + e.id + '\')">&#215;</button></div></div>';
-                    });
-                }
-                el.innerHTML = h;
-            } catch (err) { el.innerHTML = '<p class="empty">Error loading expenses</p>'; }
-        }
-        async function handleAddExpense(e, fid) {
-            e.preventDefault();
-            try { await api('/api/flats/' + fid + '/expenses', { method: 'POST', body: JSON.stringify({ description: document.getElementById('e-desc').value, amount: parseFloat(document.getElementById('e-amount').value), payerId: document.getElementById('e-payer').value }) }); showMsg('Expense added!', 'success'); flatDetailPage(fid, 'expenses'); } catch (err) { showMsg(err.message); }
-        }
-        async function deleteExpense(fid, eid) {
-            if (!confirm('Delete this expense?')) return;
-            try { await api('/api/flats/' + fid + '/expenses/' + eid, { method: 'DELETE' }); showMsg('Deleted', 'success'); flatDetailPage(fid, 'expenses'); } catch (err) { showMsg(err.message); }
-        }
+// ── Auth Pages ──
+function loginPage(){
+    hideChrome();
+    document.getElementById('app').className='flex flex-col items-center justify-center min-h-[80dvh] px-5 max-w-lg mx-auto';
+    document.getElementById('app').innerHTML=`
+        <div class="w-full space-y-6">
+            <div class="text-center space-y-1">
+                <h1 class="font-headline text-2xl font-extrabold text-brand lowercase tracking-tight">sharesense</h1>
+                <p class="text-on-surface-light text-xs">split expenses, stay in harmony</p>
+            </div>
+            <div class="bg-surface-card rounded-2xl p-6 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-4">
+                <form onsubmit="handleLogin(event)" class="space-y-3">
+                    <input type="email" id="l-email" placeholder="Email" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+                    <input type="password" id="l-pass" placeholder="Password" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+                    <button class="w-full py-3 bg-brand text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-transform" type="submit">Login</button>
+                </form>
+                <p class="text-center text-xs text-on-surface-light">No account? <a href="#register" class="text-brand font-semibold">Register</a></p>
+            </div>
+        </div>`;
+}
+async function handleLogin(e){
+    e.preventDefault();
+    try{ const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:document.getElementById('l-email').value,password:document.getElementById('l-pass').value})}); setAuth(d.token,d.user); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
+}
+function registerPage(){
+    hideChrome();
+    document.getElementById('app').className='flex flex-col items-center justify-center min-h-[80dvh] px-5 max-w-lg mx-auto';
+    document.getElementById('app').innerHTML=`
+        <div class="w-full space-y-6">
+            <div class="text-center space-y-1">
+                <h1 class="font-headline text-2xl font-extrabold text-brand lowercase tracking-tight">sharesense</h1>
+                <p class="text-on-surface-light text-xs">create your account</p>
+            </div>
+            <div class="bg-surface-card rounded-2xl p-6 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-4">
+                <form onsubmit="handleRegister(event)" class="space-y-3">
+                    <input type="text" id="r-name" placeholder="Name" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+                    <input type="email" id="r-email" placeholder="Email" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+                    <input type="password" id="r-pass" placeholder="Password (min 6 chars)" required minlength="6" class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+                    <button class="w-full py-3 bg-brand text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-transform" type="submit">Register</button>
+                </form>
+                <p class="text-center text-xs text-on-surface-light">Have an account? <a href="#login" class="text-brand font-semibold">Login</a></p>
+            </div>
+        </div>`;
+}
+async function handleRegister(e){
+    e.preventDefault();
+    try{ await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:document.getElementById('r-name').value,email:document.getElementById('r-email').value,password:document.getElementById('r-pass').value})}); showMsg('Registered! Please login.','success'); location.hash='#login'; }catch(err){ showMsg(err.message); }
+}
+</script>
 
-        // --- Settlements ---
-        async function renderSettlements(fid) {
-            const el = document.getElementById('tab-content');
-            try {
-                const d = await api('/api/flats/' + fid + '/settlements');
-                const m = flatCache.members || [];
-                let h = '<h2 class="mb-1">Record Payment</h2><form onsubmit="handleSettle(event,\'' + fid + '\')">';
-                h += '<select id="s-debtor"><option value="">Who paid?</option>';
-                m.forEach(x => { h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
-                h += '</select><select id="s-creditor"><option value="">Paid to?</option>';
-                m.forEach(x => { h += '<option value="' + x.id + '">' + esc(x.name) + '</option>'; });
-                h += '</select><input type="number" id="s-amount" placeholder="Amount (' + CUR + ')" step="0.01" min="0.01" required>';
-                h += '<button class="btn" type="submit">Propose</button></form>';
-                h += '<h2 class="mt-2 mb-1">History</h2>';
-                if (d.settlements.length === 0) { h += '<p class="empty">No settlements yet</p>'; }
-                else {
-                    d.settlements.forEach(s => {
-                        let badge = s.status === 'confirmed' ? '<span class="badge badge-green">Confirmed</span>' : '<span class="badge badge-yellow">Pending</span>';
-                        h += '<div class="list-item"><div><strong>' + esc(s.debtor_name) + ' &rarr; ' + esc(s.creditor_name) + '</strong><br><small style="color:var(--text-light)">' + CUR + parseFloat(s.amount).toFixed(2) + ' &middot; ' + new Date(s.created_at).toLocaleDateString() + '</small></div><div style="text-align:right">' + badge;
-                        if (s.status === 'pending') { h += '<br><button class="btn btn-sm btn-green mt-1" onclick="confirmSettlement(\'' + fid + '\',\'' + s.id + '\')">Confirm</button>'; }
-                        h += '</div></div>';
-                    });
-                }
-                el.innerHTML = h;
-            } catch (err) { el.innerHTML = '<p class="empty">Error loading settlements</p>'; }
-        }
-        async function handleSettle(e, fid) {
-            e.preventDefault();
-            const a = document.getElementById('s-debtor').value, b = document.getElementById('s-creditor').value;
-            if (!a || !b) { showMsg('Select both parties'); return; }
-            if (a === b) { showMsg('Must be different people'); return; }
-            try { await api('/api/flats/' + fid + '/settlements', { method: 'POST', body: JSON.stringify({ debtorId: a, creditorId: b, amount: parseFloat(document.getElementById('s-amount').value) }) }); showMsg('Settlement proposed!', 'success'); flatDetailPage(fid, 'settlements'); } catch (err) { showMsg(err.message); }
-        }
-        async function confirmSettlement(fid, sid) {
-            try { await api('/api/flats/' + fid + '/settlements/' + sid + '/confirm', { method: 'POST' }); showMsg('Confirmed!', 'success'); flatDetailPage(fid, 'settlements'); } catch (err) { showMsg(err.message); }
-        }
-
-        // --- Members ---
-        function renderMembers(fid) {
-            const m = flatCache.members || [];
-            let h = '<h2 class="mb-1">Members (' + m.length + ')</h2>';
-            m.forEach(x => {
-                h += '<div class="list-item"><div><strong>' + esc(x.name) + '</strong><br><small style="color:var(--text-light)">' + esc(x.email) + '</small></div>';
-                if (x.id !== state.user.id) { h += '<button class="btn btn-sm btn-danger" onclick="removeMember(\'' + fid + '\',\'' + x.id + '\')">Remove</button>'; }
-                else { h += '<span class="badge badge-default">You</span>'; }
-                h += '</div>';
+<script>
+// ── Dashboard ──
+async function dashboardPage(){
+    showChrome(); document.getElementById('footer-nav').style.display='none';
+    const app=document.getElementById('app');
+    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+    app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
+    try{
+        const d=await api('/api/flats');
+        let h='<section class="space-y-4">';
+        h+='<div class="flex items-center justify-between"><h2 class="font-headline text-xl font-bold tracking-tight">My Flats</h2>';
+        h+='<button onclick="location.hash=\'#new-flat\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div>';
+        if(d.flats.length===0){
+            h+='<div class="bg-surface-card rounded-2xl p-8 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center"><span class="material-symbols-outlined text-4xl text-on-surface-light mb-2">home_work</span><p class="text-on-surface-light text-xs">No flats yet. Create one!</p></div>';
+        } else {
+            d.flats.forEach(f=>{
+                h+='<a href="#flat/'+f.id+'" class="block bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] active:scale-[0.98] transition-transform">';
+                h+='<div class="flex items-center gap-4"><div class="w-11 h-11 rounded-xl bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand">apartment</span></div>';
+                h+='<div class="flex-1"><p class="font-headline text-sm font-bold">'+esc(f.name)+'</p><p class="text-on-surface-light text-[11px]">Joined '+new Date(f.created_at).toLocaleDateString()+'</p></div>';
+                h+='<span class="material-symbols-outlined text-on-surface-light text-[20px]">chevron_right</span></div></a>';
             });
-            h += '<h2 class="mt-2 mb-1">Add Member</h2>';
-            h += '<form onsubmit="handleAddMember(event,\'' + fid + '\')"><input type="email" id="add-email" placeholder="Email address"><button class="btn btn-sm" type="submit">Add</button></form>';
-            document.getElementById('tab-content').innerHTML = h;
         }
-        async function handleAddMember(e, fid) {
-            e.preventDefault();
-            try { await api('/api/flats/' + fid + '/members', { method: 'POST', body: JSON.stringify({ email: document.getElementById('add-email').value }) }); showMsg('Member added!', 'success'); flatDetailPage(fid, 'members'); } catch (err) { showMsg(err.message); }
-        }
-        async function removeMember(fid, uid) {
-            if (!confirm('Remove this member?')) return;
-            try { await api('/api/flats/' + fid + '/members/' + uid, { method: 'DELETE' }); showMsg('Removed', 'success'); flatDetailPage(fid, 'members'); } catch (err) { showMsg(err.message); }
+        h+='</section>';
+        app.innerHTML=h;
+    }catch(err){ showMsg(err.message); }
+}
+
+function newFlatPage(){
+    showChrome(); document.getElementById('footer-nav').style.display='none';
+    const app=document.getElementById('app');
+    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+    app.innerHTML=`
+        <div class="bg-surface-card rounded-2xl p-6 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-4">
+            <h2 class="font-headline text-lg font-bold">Create New Flat</h2>
+            <form onsubmit="handleCreateFlat(event)" class="space-y-3">
+                <input type="text" id="f-name" placeholder="Flat name (e.g. Flat 101)" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+                <button class="w-full py-3 bg-brand text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-transform" type="submit">Create</button>
+            </form>
+            <a href="#dashboard" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">arrow_back</span>Back</a>
+        </div>`;
+}
+async function handleCreateFlat(e){
+    e.preventDefault();
+    try{ await api('/api/flats',{method:'POST',body:JSON.stringify({name:document.getElementById('f-name').value})}); showMsg('Flat created!','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
+}
+
+// ── Flat Detail ──
+async function flatDetailPage(fid,tab){
+    tab=tab||'ledger';
+    showChrome();
+    const app=document.getElementById('app');
+    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+    app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
+    try{
+        const [fd,md]=await Promise.all([api('/api/flats/'+fid),api('/api/flats/'+fid+'/members')]);
+        flatCache={flat:fd.flat,members:md.members,flatId:fid};
+        let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
+        h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(fd.flat.name)+'</h2></div>';
+        h+='<div id="tab-content"></div>';
+        app.innerHTML=h;
+        showFooter(fid,tab);
+        if(tab==='ledger') renderLedger(fid);
+        else if(tab==='expenses') renderExpenses(fid);
+        else if(tab==='settlements') renderSettlements(fid);
+        else if(tab==='members') renderMembers(fid);
+    }catch(err){ showMsg(err.message); }
+}
+</script>
+
+<script>
+// ── Ledger Tab (Balances + Settlement CTA) ──
+async function renderLedger(fid){
+    const el=document.getElementById('tab-content');
+    try{
+        const [bd,ed]=await Promise.all([api('/api/flats/'+fid+'/balances'),api('/api/flats/'+fid+'/expenses')]);
+        const transfers=bd.transfers||[];
+        const expenses=ed.expenses||[];
+        const members=flatCache.members||[];
+
+        // Compute totals for current user
+        let youOwe=0, youAreOwed=0;
+        transfers.forEach(t=>{
+            if(t.from_id===S.user.id) youOwe+=t.amount;
+            if(t.to_id===S.user.id) youAreOwed+=t.amount;
+        });
+        const net=youAreOwed-youOwe;
+
+        let h='';
+        // Bento balance cards
+        h+='<div class="grid grid-cols-2 gap-3">';
+        h+='<div class="col-span-2 p-6 rounded-2xl bg-surface-card shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center">';
+        h+='<p class="text-on-surface-light text-[11px] mb-1">Total Net Balance</p>';
+        const netCls=net>=0?'text-brand':'text-danger';
+        h+='<h2 class="font-headline font-extrabold text-3xl '+netCls+' tracking-tight">'+(net>=0?'+':'-')+CUR+Math.abs(net).toFixed(2)+'</h2></div>';
+        h+='<div class="p-4 rounded-2xl bg-success-bg"><p class="text-[10px] text-brand mb-1">You are owed</p><p class="font-headline font-bold text-xl text-brand">'+CUR+youAreOwed.toFixed(2)+'</p></div>';
+        h+='<div class="p-4 rounded-2xl bg-danger-bg"><p class="text-[10px] text-danger mb-1">You owe</p><p class="font-headline font-bold text-xl text-danger">'+CUR+youOwe.toFixed(2)+'</p></div>';
+        h+='</div>';
+
+        // Settlement CTA
+        h+='<div class="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-brand to-brand-container text-white shadow-xl mt-4">';
+        h+='<div class="relative z-10 flex items-center justify-between"><div class="space-y-1"><h3 class="font-headline font-bold text-base">Record Settlement</h3><p class="text-[11px] opacity-90 max-w-[200px]">Paid back a flatmate? Keep the ledger balanced.</p></div>';
+        h+='<button onclick="switchTab(\''+fid+'\',\'settlements\')" class="bg-surface-card text-brand px-3 py-2 rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-transform">Settle</button></div>';
+        h+='<div class="absolute -right-10 -bottom-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div></div>';
+
+        // Flatmates horizontal scroll
+        if(members.length>0){
+            h+='<div class="space-y-3 mt-4"><div class="flex items-center justify-between"><h3 class="font-headline text-base font-bold tracking-tight">Flatmates</h3>';
+            h+='<button onclick="switchTab(\''+fid+'\',\'members\')" class="text-brand text-xs font-medium">Manage</button></div>';
+            h+='<div class="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5">';
+            members.forEach(m=>{
+                let relation='';
+                transfers.forEach(t=>{
+                    if(t.from_id===m.id&&t.to_id===S.user.id) relation='<p class="text-[10px] text-brand mt-1">owes you '+CUR+t.amount.toFixed(2)+'</p>';
+                    if(t.to_id===m.id&&t.from_id===S.user.id) relation='<p class="text-[10px] text-danger mt-1">you owe '+CUR+t.amount.toFixed(2)+'</p>';
+                });
+                if(m.id===S.user.id) relation='<p class="text-[10px] text-on-surface-light mt-1">You</p>';
+                if(!relation) relation='<p class="text-[10px] text-on-surface-light mt-1">settled</p>';
+                h+='<div class="flex-shrink-0 w-28 p-3 bg-surface-card rounded-xl shadow-sm text-center">';
+                h+='<div class="w-10 h-10 mx-auto mb-2 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">person</span></div>';
+                h+='<p class="text-[11px] font-bold truncate">'+esc(m.name)+'</p>'+relation+'</div>';
+            });
+            h+='</div></div>';
         }
 
-        // --- Router ---
-        function route() {
-            renderNav();
-            const hash = location.hash.slice(1) || '';
-            if (!state.token) { hideFooter(); return hash === 'register' ? registerPage() : loginPage(); }
-            if (hash === 'dashboard' || hash === '') return dashboardPage();
-            if (hash === 'new-flat') return newFlatPage();
-            if (hash.startsWith('flat/')) return flatDetailPage(hash.split('/')[1]);
-            dashboardPage();
+        // Recent activity
+        if(expenses.length>0){
+            h+='<div class="space-y-3 mt-4"><h3 class="font-headline text-base font-bold tracking-tight">Recent activity</h3>';
+            const recent=expenses.slice(0,5);
+            const icons=['shopping_basket','bolt','router','restaurant','local_taxi','water_drop'];
+            recent.forEach((e,i)=>{
+                const isYou=e.payer_id===S.user.id;
+                const amtCls=isYou?'text-brand':'text-danger';
+                const sign=isYou?'+':'-';
+                const share=parseFloat(e.amount)/members.length;
+                h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
+                h+='<div class="w-9 h-9 rounded-lg bg-surface-low flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icons[i%icons.length]+'</span></div>';
+                h+='<div class="flex-1"><p class="text-xs font-bold">'+esc(e.description)+'</p><p class="text-[10px] text-on-surface-light">Paid by '+esc(e.payer_name)+'</p></div>';
+                h+='<div class="text-right"><p class="font-headline text-xs font-bold '+amtCls+'">'+sign+CUR+share.toFixed(2)+'</p><p class="text-[9px] text-on-surface-light">'+new Date(e.timestamp).toLocaleDateString()+'</p></div></div>';
+            });
+            if(expenses.length>5) h+='<button onclick="switchTab(\''+fid+'\',\'expenses\')" class="w-full py-2.5 text-brand text-xs font-semibold border border-brand/10 rounded-xl hover:bg-brand/5 transition-colors">View all transactions</button>';
+            h+='</div>';
         }
-        window.addEventListener('hashchange', route);
-        route();
-    </script>
+
+        el.innerHTML=h;
+    }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading data</p>'; }
+}
+</script>
+
+<script>
+// ── Expenses Tab (Split page) ──
+const CATEGORIES=[
+    {id:'groceries',icon:'shopping_basket',label:'Groceries'},
+    {id:'rent',icon:'home_work',label:'Rent'},
+    {id:'utilities',icon:'bolt',label:'Utilities'},
+    {id:'fun',icon:'theater_comedy',label:'Fun'},
+    {id:'food',icon:'restaurant',label:'Food'},
+    {id:'transport',icon:'local_taxi',label:'Transport'},
+];
+let _splitState={category:'groceries',selectedMembers:[],payerId:null,amount:0};
+
+function getCatIcon(desc){
+    const d=(desc||'').toLowerCase();
+    if(d.includes('grocer')||d.includes('vegetable')||d.includes('fruit')) return 'shopping_basket';
+    if(d.includes('rent')) return 'home_work';
+    if(d.includes('electric')||d.includes('bill')||d.includes('utilit')||d.includes('water')||d.includes('gas')) return 'bolt';
+    if(d.includes('movie')||d.includes('fun')||d.includes('game')||d.includes('party')) return 'theater_comedy';
+    if(d.includes('food')||d.includes('dinner')||d.includes('lunch')||d.includes('breakfast')||d.includes('restaurant')) return 'restaurant';
+    if(d.includes('taxi')||d.includes('uber')||d.includes('cab')||d.includes('fuel')||d.includes('petrol')) return 'local_taxi';
+    return 'receipt_long';
+}
+
+function updateSplitSummary(){
+    const el=document.getElementById('split-summary');
+    if(!el) return;
+    const amt=parseFloat(document.getElementById('e-amount')?.value)||0;
+    const sel=_splitState.selectedMembers;
+    const payerId=_splitState.payerId||S.user.id;
+    const members=flatCache.members||[];
+    // count = selected members (payer is always included)
+    const splitIds=new Set(sel);
+    splitIds.add(payerId);
+    const count=splitIds.size;
+    const share=count>0?amt/count:0;
+
+    let h='';
+    members.forEach(m=>{
+        if(m.id===payerId) return; // payer doesn't owe themselves
+        if(!splitIds.has(m.id)) return;
+        const initial=m.name.charAt(0).toUpperCase();
+        h+='<div class="flex items-center justify-between">';
+        h+='<div class="flex items-center gap-3">';
+        h+='<div class="w-8 h-8 rounded-full bg-brand-light flex items-center justify-center font-bold text-xs text-brand">'+initial+'</div>';
+        h+='<span class="font-body text-sm font-medium text-on-surface-light">'+esc(m.name)+' will owe</span></div>';
+        h+='<span class="font-headline font-bold text-brand">'+CUR+share.toFixed(2)+'</span></div>';
+    });
+    if(!h) h='<p class="text-on-surface-light text-xs text-center">Select members to split with</p>';
+    el.innerHTML=h;
+}
+
+function toggleSplitMember(uid){
+    const idx=_splitState.selectedMembers.indexOf(uid);
+    if(idx===-1) _splitState.selectedMembers.push(uid);
+    else _splitState.selectedMembers.splice(idx,1);
+    renderSplitMembers();
+    updateSplitSummary();
+}
+
+function selectAllSplitMembers(){
+    const members=flatCache.members||[];
+    _splitState.selectedMembers=members.map(m=>m.id);
+    renderSplitMembers();
+    updateSplitSummary();
+}
+
+function renderSplitMembers(){
+    const el=document.getElementById('split-members');
+    if(!el) return;
+    const members=flatCache.members||[];
+    let h='';
+    members.forEach(m=>{
+        const sel=_splitState.selectedMembers.includes(m.id);
+        const initial=m.name.charAt(0).toUpperCase();
+        const borderCls=sel?'border-brand':'border-transparent opacity-50';
+        const checkMark=sel?'<div class="absolute -bottom-1 -right-1 bg-brand text-white w-5 h-5 rounded-full flex items-center justify-center shadow-lg"><span class="material-symbols-outlined text-[14px] mso-fill">check</span></div>':'';
+        h+='<div class="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer" onclick="toggleSplitMember(\''+m.id+'\')">';
+        h+='<div class="relative"><div class="w-14 h-14 rounded-full border-[3px] '+borderCls+' p-0.5 flex items-center justify-center bg-brand-light transition-all">';
+        h+='<span class="material-symbols-outlined text-brand text-[28px]">person</span></div>'+checkMark+'</div>';
+        h+='<span class="font-body font-semibold text-[11px] '+(sel?'text-on-surface':'text-on-surface-light')+'">'+esc(m.name)+(m.id===S.user.id?' (You)':'')+'</span></div>';
+    });
+    el.innerHTML=h;
+}
+
+async function renderExpenses(fid){
+    const el=document.getElementById('tab-content');
+    try{
+        const d=await api('/api/flats/'+fid+'/expenses');
+        const m=flatCache.members||[];
+        // Init split state
+        _splitState={category:'groceries',selectedMembers:m.map(x=>x.id),payerId:S.user.id,amount:0};
+
+        let h='';
+        // ── Hero Header ──
+        h+='<section class="mb-6">';
+        h+='<div class="bg-gradient-to-br from-[#005050] to-brand p-7 rounded-[1.75rem] text-white shadow-xl relative overflow-hidden">';
+        h+='<div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>';
+        h+='<div class="relative z-10">';
+        h+='<span class="font-headline font-semibold text-[11px] tracking-[0.15em] uppercase opacity-80">New Entry</span>';
+        h+='<h2 class="text-3xl font-headline font-extrabold mt-1 tracking-tight">Log New Expense</h2>';
+        h+='</div></div></section>';
+
+        // ── Amount Input ──
+        h+='<section class="flex flex-col items-center justify-center py-5">';
+        h+='<label class="text-on-surface-light font-headline font-bold text-[10px] uppercase tracking-[0.2em] mb-3">Amount Spent</label>';
+        h+='<div class="flex items-baseline gap-1">';
+        h+='<span class="text-3xl font-headline font-medium text-brand">'+CUR+'</span>';
+        h+='<input id="e-amount" class="w-full max-w-[180px] bg-transparent border-none text-5xl font-headline font-extrabold text-on-surface focus:ring-0 placeholder:text-on-surface-light/20 p-0 text-center" placeholder="0.00" type="number" step="0.01" min="0.01" oninput="updateSplitSummary()">';
+        h+='</div>';
+        h+='<div class="w-20 h-0.5 bg-brand/10 rounded-full mt-3"></div>';
+        h+='</section>';
+
+        // ── Description ──
+        h+='<section class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] mb-5">';
+        h+='<label class="text-on-surface-light font-headline font-bold text-[10px] uppercase tracking-[0.1em] mb-2 block">What was it for?</label>';
+        h+='<input id="e-desc" class="w-full bg-transparent border-none p-0 text-lg font-body font-medium text-on-surface focus:ring-0 placeholder:text-on-surface-light/40" placeholder="Weekly grocery run..." type="text" required>';
+        h+='</section>';
+
+        // ── Category Selection ──
+        h+='<section class="mb-5">';
+        h+='<h3 class="font-headline font-bold text-on-surface mb-3 text-sm">Choose Category</h3>';
+        h+='<div class="grid grid-cols-3 gap-2" id="cat-grid">';
+        CATEGORIES.forEach(c=>{
+            const active=c.id===_splitState.category;
+            const cls=active?'bg-brand text-white shadow-md':'bg-surface-card text-on-surface-light hover:bg-brand-light';
+            h+='<button onclick="pickCategory(\''+c.id+'\')" class="flex items-center gap-2 p-3 rounded-xl '+cls+' transition-all active:scale-95">';
+            h+='<span class="material-symbols-outlined text-[18px]">'+c.icon+'</span>';
+            h+='<span class="font-headline font-semibold text-xs">'+c.label+'</span></button>';
+        });
+        h+='</div></section>';
+
+        // ── Paid By ──
+        h+='<section class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] mb-5">';
+        h+='<label class="text-on-surface-light font-headline font-bold text-[10px] uppercase tracking-[0.1em] mb-2 block">Paid By</label>';
+        h+='<select id="e-payer" onchange="_splitState.payerId=this.value;updateSplitSummary()" class="w-full bg-transparent border-none p-0 text-sm font-body font-medium text-on-surface focus:ring-0">';
+        m.forEach(x=>{ h+='<option value="'+x.id+'"'+(x.id===S.user.id?' selected':'')+'>'+esc(x.name)+(x.id===S.user.id?' (You)':'')+'</option>'; });
+        h+='</select></section>';
+
+        // ── Split With (member avatars) ──
+        h+='<section class="mb-5">';
+        h+='<div class="flex items-center justify-between mb-3">';
+        h+='<h3 class="font-headline font-bold text-on-surface text-sm">Split with</h3>';
+        h+='<button onclick="selectAllSplitMembers()" class="text-brand font-headline font-bold text-xs">Select All</button></div>';
+        h+='<div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar" id="split-members"></div>';
+        h+='</section>';
+
+        // ── Split Logic Summary ──
+        h+='<section class="bg-brand-light/40 p-5 rounded-2xl border border-brand/10 mb-5">';
+        h+='<h3 class="font-headline font-bold text-brand text-[10px] uppercase tracking-[0.15em] mb-3">The Split Logic</h3>';
+        h+='<div class="space-y-3" id="split-summary"></div>';
+        h+='</section>';
+
+        // ── Add to Ledger Button ──
+        h+='<button onclick="submitExpense(\''+fid+'\')" class="w-full py-4 rounded-2xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-extrabold text-base shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-8">';
+        h+='<span>Add to Ledger</span><span class="material-symbols-outlined">arrow_forward</span></button>';
+
+        // ── Expense History ──
+        h+='<section class="space-y-2">';
+        h+='<h3 class="font-headline text-sm font-bold">Recent Expenses</h3>';
+        if(d.expenses.length===0){
+            h+='<p class="text-center text-on-surface-light text-xs py-6">No expenses yet. Add your first one above.</p>';
+        } else {
+            d.expenses.forEach(e=>{
+                const icon=getCatIcon(e.description);
+                h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
+                h+='<div class="w-9 h-9 rounded-lg bg-brand-light flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icon+'</span></div>';
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(e.description)+'</p><p class="text-[10px] text-on-surface-light">'+esc(e.payer_name)+' &middot; '+new Date(e.timestamp).toLocaleDateString()+'</p></div>';
+                h+='<div class="text-right flex items-center gap-1.5 flex-shrink-0"><p class="font-headline text-xs font-bold">'+CUR+parseFloat(e.amount).toFixed(2)+'</p>';
+                h+='<button onclick="deleteExpense(\''+fid+'\',\''+e.id+'\')" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[16px]">close</span></button></div></div>';
+            });
+        }
+        h+='</section>';
+
+        el.innerHTML=h;
+        // Render interactive parts
+        renderSplitMembers();
+        updateSplitSummary();
+    }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading expenses</p>'; }
+}
+
+function pickCategory(id){
+    _splitState.category=id;
+    const grid=document.getElementById('cat-grid');
+    if(!grid) return;
+    grid.querySelectorAll('button').forEach(btn=>{
+        const cid=btn.getAttribute('onclick').match(/'(\w+)'/)[1];
+        if(cid===id){ btn.className='flex items-center gap-2 p-3 rounded-xl bg-brand text-white shadow-md transition-all active:scale-95'; }
+        else { btn.className='flex items-center gap-2 p-3 rounded-xl bg-surface-card text-on-surface-light hover:bg-brand-light transition-all active:scale-95'; }
+    });
+}
+
+async function submitExpense(fid){
+    const desc=(document.getElementById('e-desc')?.value||'').trim();
+    const amt=parseFloat(document.getElementById('e-amount')?.value);
+    const payerId=document.getElementById('e-payer')?.value;
+    if(!desc){ showMsg('Please add a description'); return; }
+    if(!amt||amt<=0){ showMsg('Enter a valid amount'); return; }
+    try{
+        await api('/api/flats/'+fid+'/expenses',{method:'POST',body:JSON.stringify({description:desc,amount:amt,payerId:payerId})});
+        showMsg('Expense added!','success');
+        flatDetailPage(fid,'expenses');
+    }catch(err){ showMsg(err.message); }
+}
+
+async function handleAddExpense(e,fid){ e.preventDefault(); submitExpense(fid); }
+
+async function deleteExpense(fid,eid){
+    if(!confirm('Delete this expense?')) return;
+    try{ await api('/api/flats/'+fid+'/expenses/'+eid,{method:'DELETE'}); showMsg('Deleted','success'); flatDetailPage(fid,'expenses'); }catch(err){ showMsg(err.message); }
+}
+
+// ── Settlements Tab ──
+let _settleState={debtorId:null,creditorId:null};
+
+function renderSettleMembers(containerId, selectedId, onClickFn){
+    const el=document.getElementById(containerId);
+    if(!el) return;
+    const members=flatCache.members||[];
+    let h='';
+    members.forEach(m=>{
+        const sel=m.id===selectedId;
+        const initial=m.name.charAt(0).toUpperCase();
+        const borderCls=sel?'border-brand ring-4 ring-brand/10':'border-transparent opacity-40 hover:opacity-100';
+        h+='<div class="flex-shrink-0 cursor-pointer text-center space-y-1.5" onclick="'+onClickFn+'(\''+m.id+'\')">';
+        h+='<div class="w-14 h-14 rounded-full p-0.5 border-[3px] '+borderCls+' transition-all flex items-center justify-center bg-brand-light">';
+        h+='<span class="material-symbols-outlined text-brand text-[28px]">person</span></div>';
+        h+='<span class="text-[11px] font-semibold '+(sel?'text-brand':'text-on-surface-light')+'">'+esc(m.name)+(m.id===S.user.id?' (You)':'')+'</span></div>';
+    });
+    el.innerHTML=h;
+}
+
+function pickDebtor(uid){
+    _settleState.debtorId=uid;
+    renderSettleMembers('settle-debtors',uid,'pickDebtor');
+}
+function pickCreditor(uid){
+    _settleState.creditorId=uid;
+    renderSettleMembers('settle-creditors',uid,'pickCreditor');
+}
+
+async function renderSettlements(fid){
+    const el=document.getElementById('tab-content');
+    try{
+        const [sd,bd]=await Promise.all([api('/api/flats/'+fid+'/settlements'),api('/api/flats/'+fid+'/balances')]);
+        const m=flatCache.members||[];
+        const transfers=bd.transfers||[];
+        _settleState={debtorId:null,creditorId:null};
+
+        // Compute totals for current user
+        let youAreOwed=0, youOwe=0;
+        transfers.forEach(t=>{
+            if(t.to_id===S.user.id) youAreOwed+=t.amount;
+            if(t.from_id===S.user.id) youOwe+=t.amount;
+        });
+
+        let h='';
+
+        // ── Hero Balance Cards ──
+        h+='<section class="grid grid-cols-2 gap-3 mb-6">';
+        // Owed to you
+        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] border-l-4 border-brand relative overflow-hidden">';
+        h+='<div class="absolute top-1 right-1 opacity-[0.04]"><span class="material-symbols-outlined text-[64px]">trending_up</span></div>';
+        h+='<p class="text-[10px] font-headline font-bold uppercase tracking-[0.12em] text-on-surface-light mb-1.5">Owed to You</p>';
+        h+='<p class="text-2xl font-extrabold font-headline text-brand">'+CUR+youAreOwed.toFixed(2)+'</p>';
+        h+='</div>';
+        // You owe
+        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] border-l-4 border-[#3f6374] relative overflow-hidden">';
+        h+='<div class="absolute top-1 right-1 opacity-[0.04]"><span class="material-symbols-outlined text-[64px]">trending_down</span></div>';
+        h+='<p class="text-[10px] font-headline font-bold uppercase tracking-[0.12em] text-on-surface-light mb-1.5">You Owe</p>';
+        h+='<p class="text-2xl font-extrabold font-headline text-danger">'+CUR+youOwe.toFixed(2)+'</p>';
+        h+='</div>';
+        h+='</section>';
+
+        // ── Record Settlement Section ──
+        h+='<section class="mb-6">';
+        h+='<h2 class="text-xl font-headline font-bold text-on-surface mb-1">Record Settlement</h2>';
+        h+='<p class="text-on-surface-light text-xs mb-5">Settle up with your flatmates.</p>';
+
+        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-6">';
+
+        // Payer → Receiver with avatars
+        h+='<div class="space-y-5">';
+
+        // Who paid
+        h+='<div class="space-y-2.5">';
+        h+='<label class="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-light">Who paid?</label>';
+        h+='<div class="flex gap-3 overflow-x-auto no-scrollbar" id="settle-debtors"></div>';
+        h+='</div>';
+
+        // Flow arrow
+        h+='<div class="flex justify-center">';
+        h+='<div class="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-brand">';
+        h+='<span class="material-symbols-outlined text-xl">south</span></div></div>';
+
+        // Paid to
+        h+='<div class="space-y-2.5">';
+        h+='<label class="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-light">Paid to?</label>';
+        h+='<div class="flex gap-3 overflow-x-auto no-scrollbar" id="settle-creditors"></div>';
+        h+='</div>';
+
+        h+='</div>';
+
+        // Amount + Confirm
+        h+='<div class="bg-surface-low p-4 rounded-xl space-y-4">';
+        h+='<div class="flex items-baseline gap-1 justify-center">';
+        h+='<span class="text-2xl font-headline font-medium text-brand">'+CUR+'</span>';
+        h+='<input id="s-amount" class="w-full max-w-[160px] bg-transparent border-none text-4xl font-headline font-extrabold text-on-surface focus:ring-0 placeholder:text-on-surface-light/20 p-0 text-center" placeholder="0.00" type="number" step="0.01" min="0.01">';
+        h+='</div>';
+        h+='<button onclick="submitSettlement(\''+fid+'\')" class="w-full py-3.5 rounded-xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-bold text-sm shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">';
+        h+='<span>Confirm Settlement</span><span class="material-symbols-outlined text-[20px]">handshake</span></button>';
+        h+='</div>';
+
+        h+='</div>';
+        h+='</section>';
+
+        // ── Suggested Settlements (from balances) ──
+        if(transfers.length>0){
+            h+='<section class="mb-6">';
+            h+='<h3 class="font-headline text-sm font-bold mb-3">Suggested Settlements</h3>';
+            h+='<div class="space-y-2">';
+            transfers.forEach(t=>{
+                const isYouDebtor=t.from_id===S.user.id;
+                const isYouCreditor=t.to_id===S.user.id;
+                h+='<div class="flex items-center gap-3 p-3.5 bg-brand-light/30 rounded-xl border border-brand/10">';
+                h+='<div class="w-9 h-9 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">swap_horiz</span></div>';
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(t.from_name)+' → '+esc(t.to_name)+'</p>';
+                h+='<p class="text-[10px] text-on-surface-light">'+CUR+parseFloat(t.amount).toFixed(2)+' to settle</p></div>';
+                if(isYouDebtor||isYouCreditor){
+                    h+='<button onclick="quickSettle(\''+fid+'\',\''+t.from_id+'\',\''+t.to_id+'\','+t.amount+')" class="px-3 py-1.5 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Settle</button>';
+                }
+                h+='</div>';
+            });
+            h+='</div></section>';
+        }
+
+        // ── Settlement History ──
+        h+='<section class="space-y-3">';
+        h+='<h3 class="font-headline text-sm font-bold">Settlement History</h3>';
+        if(sd.settlements.length===0){
+            h+='<p class="text-center text-on-surface-light text-xs py-6">No settlements yet</p>';
+        } else {
+            sd.settlements.forEach(s=>{
+                const isConfirmed=s.status==='confirmed';
+                const badgeCls=isConfirmed?'bg-brand-light text-brand':'bg-amber-50 text-amber-600';
+                const badgeText=isConfirmed?'Settled':'Pending';
+                const initial=s.debtor_name.charAt(0).toUpperCase();
+
+                h+='<div class="bg-surface-card p-4 rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)] flex items-center gap-3">';
+                // Avatar with check
+                h+='<div class="relative flex-shrink-0">';
+                h+='<div class="w-11 h-11 rounded-full bg-brand-light flex items-center justify-center">';
+                h+='<span class="material-symbols-outlined text-brand text-[22px]">person</span></div>';
+                if(isConfirmed){
+                    h+='<div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-brand-light rounded-full flex items-center justify-center border-2 border-surface-card">';
+                    h+='<span class="material-symbols-outlined text-[12px] text-brand mso-fill">check</span></div>';
+                }
+                h+='</div>';
+                // Info
+                h+='<div class="flex-1 min-w-0">';
+                h+='<p class="text-xs font-bold truncate">'+esc(s.debtor_name)+' → '+esc(s.creditor_name)+'</p>';
+                h+='<p class="text-[10px] text-on-surface-light">'+new Date(s.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</p>';
+                h+='</div>';
+                // Right side
+                h+='<div class="text-right flex-shrink-0 space-y-1">';
+                h+='<p class="font-headline font-bold text-sm">'+CUR+parseFloat(s.amount).toFixed(2)+'</p>';
+                h+='<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider '+badgeCls+'">'+badgeText+'</span>';
+                if(!isConfirmed){
+                    h+='<br><button onclick="confirmSettlement(\''+fid+'\',\''+s.id+'\')" class="mt-1 px-2.5 py-1 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Confirm</button>';
+                }
+                h+='</div></div>';
+            });
+        }
+        h+='</section>';
+
+        el.innerHTML=h;
+        // Render interactive member selectors
+        renderSettleMembers('settle-debtors',null,'pickDebtor');
+        renderSettleMembers('settle-creditors',null,'pickCreditor');
+    }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading settlements</p>'; }
+}
+
+async function submitSettlement(fid){
+    const a=_settleState.debtorId, b=_settleState.creditorId;
+    const amt=parseFloat(document.getElementById('s-amount')?.value);
+    if(!a){showMsg('Select who paid');return;}
+    if(!b){showMsg('Select who was paid');return;}
+    if(a===b){showMsg('Must be different people');return;}
+    if(!amt||amt<=0){showMsg('Enter a valid amount');return;}
+    try{
+        await api('/api/flats/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:a,creditorId:b,amount:amt})});
+        showMsg('Settlement proposed!','success');
+        flatDetailPage(fid,'settlements');
+    }catch(err){ showMsg(err.message); }
+}
+
+async function quickSettle(fid,fromId,toId,amount){
+    try{
+        await api('/api/flats/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:fromId,creditorId:toId,amount:amount})});
+        showMsg('Settlement proposed!','success');
+        flatDetailPage(fid,'settlements');
+    }catch(err){ showMsg(err.message); }
+}
+
+async function handleSettle(e,fid){ e.preventDefault(); submitSettlement(fid); }
+
+async function confirmSettlement(fid,sid){
+    try{ await api('/api/flats/'+fid+'/settlements/'+sid+'/confirm',{method:'POST'}); showMsg('Confirmed!','success'); flatDetailPage(fid,'settlements'); }catch(err){ showMsg(err.message); }
+}
+
+// ── Members Tab ──
+function renderMembers(fid){
+    const m=flatCache.members||[];
+    let h='<div class="space-y-2">';
+    h+='<h3 class="font-headline text-sm font-bold">Members ('+m.length+')</h3>';
+    m.forEach(x=>{
+        h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
+        h+='<div class="w-9 h-9 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">person</span></div>';
+        h+='<div class="flex-1"><p class="text-xs font-bold">'+esc(x.name)+'</p><p class="text-[10px] text-on-surface-light">'+esc(x.email)+'</p></div>';
+        if(x.id!==S.user.id) h+='<button onclick="removeMember(\''+fid+'\',\''+x.id+'\')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[18px]">person_remove</span></button>';
+        else h+='<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-light text-brand">You</span>';
+        h+='</div>';
+    });
+    h+='</div>';
+    h+='<div class="bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-3 mt-4">';
+    h+='<h3 class="font-headline text-sm font-bold">Add Member</h3>';
+    h+='<form onsubmit="handleAddMember(event,\''+fid+'\')" class="flex gap-2">';
+    h+='<input type="email" id="add-email" placeholder="Email address" class="flex-1 px-3 py-2.5 rounded-xl bg-surface-low border-none text-xs focus:ring-2 focus:ring-brand/30">';
+    h+='<button class="px-4 py-2.5 bg-brand text-white rounded-xl text-xs font-semibold active:scale-95 transition-transform" type="submit">Add</button>';
+    h+='</form></div>';
+    document.getElementById('tab-content').innerHTML=h;
+}
+async function handleAddMember(e,fid){
+    e.preventDefault();
+    try{ await api('/api/flats/'+fid+'/members',{method:'POST',body:JSON.stringify({email:document.getElementById('add-email').value})}); showMsg('Added!','success'); flatDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
+}
+async function removeMember(fid,uid){
+    if(!confirm('Remove this member?')) return;
+    try{ await api('/api/flats/'+fid+'/members/'+uid,{method:'DELETE'}); showMsg('Removed','success'); flatDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
+}
+
+// ── Router ──
+function route(){
+    const hash=location.hash.slice(1)||'';
+    if(!S.token){ hideChrome(); return hash==='register'?registerPage():loginPage(); }
+    if(hash==='dashboard'||hash==='') return dashboardPage();
+    if(hash==='new-flat') return newFlatPage();
+    if(hash.startsWith('flat/')) return flatDetailPage(hash.split('/')[1]);
+    dashboardPage();
+}
+window.addEventListener('hashchange',route);
+route();
+</script>
 </body>
 </html>

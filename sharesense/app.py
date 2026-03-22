@@ -1,7 +1,9 @@
 import os
+from decimal import Decimal
 from flask import Flask, jsonify, render_template
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 
 import config
 from database import init_db, get_db
@@ -10,12 +12,25 @@ import routes_flats
 import routes_expenses
 import routes_settlements
 
+
+class _SafeJSON(DefaultJSONProvider):
+    """Handle Decimal and datetime from Postgres."""
+    @staticmethod
+    def default(o):
+        if isinstance(o, Decimal):
+            return float(o)
+        if isinstance(o, (datetime, date)):
+            return o.isoformat()
+        return DefaultJSONProvider.default(o)
+
 # Resolve template dir relative to this file (works on Vercel too)
 _dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def create_app():
     app = Flask(__name__, template_folder=os.path.join(_dir, "templates"))
+    app.json_provider_class = _SafeJSON
+    app.json = _SafeJSON(app)
     CORS(app)
 
     app.register_blueprint(routes_auth.bp)

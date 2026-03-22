@@ -128,7 +128,7 @@ def get_balances(flat_id):
     ).fetchall()
     for p in paid:
         if p["payer_id"] in balances:
-            balances[p["payer_id"]] += p["total"]
+            balances[p["payer_id"]] += float(p["total"])
 
     owed = db.execute(
         """SELECT es.sharer_id, SUM(es.share_amount) as total
@@ -139,7 +139,7 @@ def get_balances(flat_id):
     ).fetchall()
     for o in owed:
         if o["sharer_id"] in balances:
-            balances[o["sharer_id"]] -= o["total"]
+            balances[o["sharer_id"]] -= float(o["total"])
 
     # Factor in confirmed settlements
     settlements = db.execute(
@@ -148,9 +148,9 @@ def get_balances(flat_id):
     ).fetchall()
     for s in settlements:
         if s["debtor_id"] in balances:
-            balances[s["debtor_id"]] += s["amount"]
+            balances[s["debtor_id"]] += float(s["amount"])
         if s["creditor_id"] in balances:
-            balances[s["creditor_id"]] -= s["amount"]
+            balances[s["creditor_id"]] -= float(s["amount"])
 
     # Simplify debts: greedy algorithm to minimize transactions
     debtors = []  # people who owe (negative balance)
