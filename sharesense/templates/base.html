@@ -423,7 +423,7 @@ async function renderExpenses(fid){
         h+='<div class="mt-4 flex items-center gap-2">';
         h+='<label for="receipt-input" class="cursor-pointer flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-card border border-brand/20 text-brand text-xs font-semibold hover:bg-brand-light transition-colors active:scale-95">';
         h+='<span class="material-symbols-outlined text-[18px]">document_scanner</span>Scan Receipt</label>';
-        h+='<input id="receipt-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleReceiptUpload(this)">';
+        h+='<input id="receipt-input" type="file" accept="image/*" class="hidden" onchange="handleReceiptUpload(this)">';
         h+='</div>';
         h+='<div id="receipt-status" class="mt-2 text-[10px] text-on-surface-light text-center"></div>';
 
