@@ -306,7 +306,9 @@ const CATEGORIES=[
 ];
 let _splitState={category:'groceries',selectedMembers:[],payerId:null,amount:0};
 
-function getCatIcon(desc){
+function getCatIcon(desc, category){
+    const CAT_ICONS={groceries:'shopping_basket',rent:'home_work',utilities:'bolt',fun:'theater_comedy',food:'restaurant',transport:'local_taxi'};
+    if(category && CAT_ICONS[category]) return CAT_ICONS[category];
     const d=(desc||'').toLowerCase();
     if(d.includes('grocer')||d.includes('vegetable')||d.includes('fruit')) return 'shopping_basket';
     if(d.includes('rent')) return 'home_work';
@@ -321,27 +323,39 @@ function updateSplitSummary(){
     const el=document.getElementById('split-summary');
     if(!el) return;
     const amt=parseFloat(document.getElementById('e-amount')?.value)||0;
-    const sel=_splitState.selectedMembers;
-    const payerId=_splitState.payerId||S.user.id;
+    const payerId=S.user.id;
     const members=flatCache.members||[];
-    // count = selected members (payer is always included)
-    const splitIds=new Set(sel);
-    splitIds.add(payerId);
-    const count=splitIds.size;
-    const share=count>0?amt/count:0;
+    const sel=_splitState.selectedMembers;
+
+    if(sel.length===0){
+        el.innerHTML='<p class="text-on-surface-light text-xs text-center">Select at least one member to split with</p>';
+        return;
+    }
+
+    const share=amt/sel.length;
+    const payerIncluded=sel.includes(payerId);
 
     let h='';
-    members.forEach(m=>{
-        if(m.id===payerId) return; // payer doesn't owe themselves
-        if(!splitIds.has(m.id)) return;
+    sel.forEach(uid=>{
+        const m=members.find(x=>x.id===uid);
+        if(!m) return;
+        if(uid===payerId) return; // payer doesn't owe themselves
         const initial=m.name.charAt(0).toUpperCase();
         h+='<div class="flex items-center justify-between">';
         h+='<div class="flex items-center gap-3">';
         h+='<div class="w-8 h-8 rounded-full bg-brand-light flex items-center justify-center font-bold text-xs text-brand">'+initial+'</div>';
-        h+='<span class="font-body text-sm font-medium text-on-surface-light">'+esc(m.name)+' will owe</span></div>';
+        h+='<span class="font-body text-sm font-medium text-on-surface-light">'+esc(m.name)+' owes</span></div>';
         h+='<span class="font-headline font-bold text-brand">'+CUR+share.toFixed(2)+'</span></div>';
     });
-    if(!h) h='<p class="text-on-surface-light text-xs text-center">Select members to split with</p>';
+
+    // If payer is NOT in the split, show a note that full amount is owed by others
+    if(!payerIncluded && sel.length>0){
+        h+='<p class="text-[10px] text-on-surface-light mt-2 text-center">You paid but aren\'t splitting — full amount owed back to you</p>';
+    }
+
+    if(!h && payerIncluded && sel.length===1){
+        h='<p class="text-on-surface-light text-xs text-center">Only you are selected — add others to split with</p>';
+    }
     el.innerHTML=h;
 }
 
@@ -404,7 +418,19 @@ async function renderExpenses(fid){
         h+='<input id="e-amount" class="w-full max-w-[180px] bg-transparent border-none text-5xl font-headline font-extrabold text-on-surface focus:ring-0 placeholder:text-on-surface-light/20 p-0 text-center" placeholder="0.00" type="number" step="0.01" min="0.01" oninput="updateSplitSummary()">';
         h+='</div>';
         h+='<div class="w-20 h-0.5 bg-brand/10 rounded-full mt-3"></div>';
+
+        // ── Scan Receipt (optional) ──
+        h+='<div class="mt-4 flex items-center gap-2">';
+        h+='<label for="receipt-input" class="cursor-pointer flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-card border border-brand/20 text-brand text-xs font-semibold hover:bg-brand-light transition-colors active:scale-95">';
+        h+='<span class="material-symbols-outlined text-[18px]">document_scanner</span>Scan Receipt</label>';
+        h+='<input id="receipt-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleReceiptUpload(this)">';
+        h+='</div>';
+        h+='<div id="receipt-status" class="mt-2 text-[10px] text-on-surface-light text-center"></div>';
+
         h+='</section>';
+
+        // ── Receipt Items Table (populated after scan) ──
+        h+='<div id="receipt-table" class="mb-5"></div>';
 
         // ── Description ──
         h+='<section class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] mb-5">';
@@ -425,18 +451,12 @@ async function renderExpenses(fid){
         });
         h+='</div></section>';
 
-        // ── Paid By ──
-        h+='<section class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] mb-5">';
-        h+='<label class="text-on-surface-light font-headline font-bold text-[10px] uppercase tracking-[0.1em] mb-2 block">Paid By</label>';
-        h+='<select id="e-payer" onchange="_splitState.payerId=this.value;updateSplitSummary()" class="w-full bg-transparent border-none p-0 text-sm font-body font-medium text-on-surface focus:ring-0">';
-        m.forEach(x=>{ h+='<option value="'+x.id+'"'+(x.id===S.user.id?' selected':'')+'>'+esc(x.name)+(x.id===S.user.id?' (You)':'')+'</option>'; });
-        h+='</select></section>';
-
-        // ── Split With (member avatars) ──
+        // ── Split With (member avatars) — tap to toggle, deselect yourself for "on behalf" ──
         h+='<section class="mb-5">';
         h+='<div class="flex items-center justify-between mb-3">';
         h+='<h3 class="font-headline font-bold text-on-surface text-sm">Split with</h3>';
         h+='<button onclick="selectAllSplitMembers()" class="text-brand font-headline font-bold text-xs">Select All</button></div>';
+        h+='<p class="text-[10px] text-on-surface-light mb-3">Deselect yourself if you bought this for someone else</p>';
         h+='<div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar" id="split-members"></div>';
         h+='</section>';
 
@@ -457,7 +477,7 @@ async function renderExpenses(fid){
             h+='<p class="text-center text-on-surface-light text-xs py-6">No expenses yet. Add your first one above.</p>';
         } else {
             d.expenses.forEach(e=>{
-                const icon=getCatIcon(e.description);
+                const icon=getCatIcon(e.description, e.category);
                 h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
                 h+='<div class="w-9 h-9 rounded-lg bg-brand-light flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icon+'</span></div>';
                 h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(e.description)+'</p><p class="text-[10px] text-on-surface-light">'+esc(e.payer_name)+' &middot; '+new Date(e.timestamp).toLocaleDateString()+'</p></div>';
@@ -488,11 +508,16 @@ function pickCategory(id){
 async function submitExpense(fid){
     const desc=(document.getElementById('e-desc')?.value||'').trim();
     const amt=parseFloat(document.getElementById('e-amount')?.value);
-    const payerId=document.getElementById('e-payer')?.value;
     if(!desc){ showMsg('Please add a description'); return; }
     if(!amt||amt<=0){ showMsg('Enter a valid amount'); return; }
+    if(_splitState.selectedMembers.length===0){ showMsg('Select at least one person to split with'); return; }
     try{
-        await api('/api/flats/'+fid+'/expenses',{method:'POST',body:JSON.stringify({description:desc,amount:amt,payerId:payerId})});
+        await api('/api/flats/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
+            description:desc,
+            amount:amt,
+            sharerIds:_splitState.selectedMembers,
+            category:_splitState.category
+        })});
         showMsg('Expense added!','success');
         flatDetailPage(fid,'expenses');
     }catch(err){ showMsg(err.message); }
@@ -503,6 +528,97 @@ async function handleAddExpense(e,fid){ e.preventDefault(); submitExpense(fid); 
 async function deleteExpense(fid,eid){
     if(!confirm('Delete this expense?')) return;
     try{ await api('/api/flats/'+fid+'/expenses/'+eid,{method:'DELETE'}); showMsg('Deleted','success'); flatDetailPage(fid,'expenses'); }catch(err){ showMsg(err.message); }
+}
+
+let _receiptItems=[];
+
+async function handleReceiptUpload(input){
+    const file=input.files&&input.files[0];
+    if(!file) return;
+    const status=document.getElementById('receipt-status');
+    if(status) status.textContent='Scanning receipt...';
+
+    try{
+        const b64=await new Promise((res,rej)=>{
+            const r=new FileReader();
+            r.onload=()=>res(r.result);
+            r.onerror=rej;
+            r.readAsDataURL(file);
+        });
+        const d=await api('/api/parse-receipt',{method:'POST',body:JSON.stringify({image:b64,mimeType:file.type||'image/jpeg'})});
+        if(d.error&&d.items&&d.items.length===0){
+            if(status) status.textContent=d.error;
+            return;
+        }
+        // Store parsed items and show editable table
+        _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other'}));
+        renderReceiptTable();
+        // Auto-select category if returned
+        if(d.category) pickCategory(d.category);
+        if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — edit below then confirm</span>';
+    }catch(err){
+        if(status) status.textContent=err.message||'Failed to scan receipt';
+    }
+    input.value='';
+}
+
+function renderReceiptTable(){
+    const el=document.getElementById('receipt-table');
+    if(!el) return;
+    if(_receiptItems.length===0){ el.innerHTML=''; return; }
+
+    let total=0;
+    let h='<div class="bg-surface-card rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] overflow-hidden">';
+    h+='<div class="flex items-center justify-between px-4 py-3 bg-brand-light/40 border-b border-brand/10">';
+    h+='<span class="font-headline font-bold text-xs text-brand">Scanned Items</span>';
+    h+='<button onclick="confirmReceiptItems()" class="px-3 py-1 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Confirm All</button></div>';
+    h+='<table class="w-full text-xs"><thead><tr class="text-on-surface-light text-[10px] uppercase tracking-wider">';
+    h+='<th class="text-left px-4 py-2 font-bold">Item</th><th class="text-right px-4 py-2 font-bold w-24">Price</th>';
+    h+='<th class="w-10 px-2 py-2"></th></tr></thead><tbody>';
+
+    _receiptItems.forEach((it,i)=>{
+        total+=it.price;
+        h+='<tr class="border-t border-surface-low">';
+        h+='<td class="px-4 py-2"><input class="w-full bg-transparent border-none p-0 text-xs font-medium focus:ring-0" value="'+esc(it.name)+'" onchange="updateReceiptItem('+i+',\'name\',this.value)"></td>';
+        h+='<td class="px-4 py-2 text-right"><input class="w-full bg-transparent border-none p-0 text-xs font-bold text-right focus:ring-0" type="number" step="0.01" value="'+it.price.toFixed(2)+'" onchange="updateReceiptItem('+i+',\'price\',this.value)"></td>';
+        h+='<td class="px-2 py-2 text-center"><button onclick="removeReceiptItem('+i+')" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[14px]">close</span></button></td>';
+        h+='</tr>';
+    });
+
+    h+='<tr class="border-t-2 border-brand/20"><td class="px-4 py-2 font-headline font-bold text-brand">Total</td>';
+    h+='<td class="px-4 py-2 text-right font-headline font-bold text-brand">'+CUR+total.toFixed(2)+'</td><td></td></tr>';
+    h+='</tbody></table></div>';
+    el.innerHTML=h;
+}
+
+function updateReceiptItem(idx,field,val){
+    if(!_receiptItems[idx]) return;
+    if(field==='price') _receiptItems[idx].price=parseFloat(val)||0;
+    else _receiptItems[idx][field]=val;
+    renderReceiptTable();
+}
+
+function removeReceiptItem(idx){
+    _receiptItems.splice(idx,1);
+    renderReceiptTable();
+}
+
+function confirmReceiptItems(){
+    if(_receiptItems.length===0) return;
+    let total=0;
+    const parts=[];
+    _receiptItems.forEach(it=>{
+        total+=it.price;
+        if(it.name) parts.push(it.name+'('+it.price.toFixed(2)+')');
+    });
+    const amtEl=document.getElementById('e-amount');
+    const descEl=document.getElementById('e-desc');
+    if(amtEl) amtEl.value=total.toFixed(2);
+    if(descEl) descEl.value=parts.join(', ');
+    _receiptItems=[];
+    renderReceiptTable();
+    updateSplitSummary();
+    showMsg('Items confirmed — review and submit','success');
 }
 
 // ── Settlements Tab ──

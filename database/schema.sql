@@ -59,6 +59,7 @@ CREATE TABLE expenses (
   payer_id UUID REFERENCES users(id),
   flat_id UUID REFERENCES flats(id) ON DELETE CASCADE,
   expense_type VARCHAR(20) NOT NULL CHECK (expense_type IN ('shared', 'personal')),
+  category VARCHAR(50) DEFAULT 'other',
   timestamp TIMESTAMP NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

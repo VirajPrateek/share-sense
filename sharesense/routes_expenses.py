@@ -19,8 +19,9 @@ def add_expense(flat_id):
     data = request.get_json(silent=True) or {}
     amount = data.get("amount")
     description = (data.get("description") or "").strip()
-    payer_id = data.get("payerId") or request.user_id
     expense_type = data.get("expenseType", "shared")
+    category = data.get("category", "other")
+    sharer_ids = data.get("sharerIds")  # optional list of user IDs to split among
     timestamp = data.get("timestamp") or datetime.now(timezone.utc).isoformat()
 
     if not amount or float(amount) <= 0:
@@ -37,26 +38,49 @@ def add_expense(flat_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
+    # Payer is always the logged-in user — you can only log your own expenses
+    payer_id = request.user_id
+
     # Create expense
     expense_id = str(uuid.uuid4())
     db.execute(
-        "INSERT INTO expenses (id, amount, description, payer_id, flat_id, expense_type, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (expense_id, amount, description, payer_id, flat_id, expense_type, timestamp),
+        "INSERT INTO expenses (id, amount, description, payer_id, flat_id, expense_type, category, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (expense_id, amount, description, payer_id, flat_id, expense_type, category, timestamp),
     )
 
-    # If shared, split equally among all members
+    # If shared, split among specified members (or all members if not specified)
     if expense_type == "shared":
-        members = db.execute("SELECT user_id FROM flat_members WHERE flat_id = ?", (flat_id,)).fetchall()
-        share = round(amount / len(members), 2)
-        for m in members:
+        if sharer_ids and len(sharer_ids) > 0:
+            # Validate all sharer IDs are flat members
+            members = db.execute("SELECT user_id FROM flat_members WHERE flat_id = ?", (flat_id,)).fetchall()
+            member_ids = {m["user_id"] for m in members}
+            for sid in sharer_ids:
+                if sid not in member_ids:
+                    db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+                    db.commit()
+                    db.close()
+                    return jsonify({"error": "One or more selected members are not in this flat"}), 400
+            split_ids = sharer_ids
+        else:
+            members = db.execute("SELECT user_id FROM flat_members WHERE flat_id = ?", (flat_id,)).fetchall()
+            split_ids = [m["user_id"] for m in members]
+
+        if len(split_ids) == 0:
+            db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+            db.commit()
+            db.close()
+            return jsonify({"error": "At least one member must be selected for splitting"}), 400
+
+        share = round(amount / len(split_ids), 2)
+        for sid in split_ids:
             db.execute(
                 "INSERT INTO expense_shares (id, expense_id, sharer_id, share_amount) VALUES (?, ?, ?, ?)",
-                (str(uuid.uuid4()), expense_id, m["user_id"], share),
+                (str(uuid.uuid4()), expense_id, sid, share),
             )
 
     db.commit()
     expense = dict_row(db.execute(
-        "SELECT id, amount, description, payer_id, flat_id, expense_type, timestamp, created_at FROM expenses WHERE id = ?",
+        "SELECT id, amount, description, payer_id, flat_id, expense_type, category, timestamp, created_at FROM expenses WHERE id = ?",
         (expense_id,),
     ).fetchone())
     db.close()
@@ -72,7 +96,7 @@ def get_expenses(flat_id):
         return jsonify({"error": "Access denied"}), 403
 
     rows = db.execute(
-        """SELECT e.id, e.amount, e.description, e.payer_id, e.expense_type, e.timestamp, e.created_at,
+        """SELECT e.id, e.amount, e.description, e.payer_id, e.expense_type, e.category, e.timestamp, e.created_at,
                   u.name as payer_name
            FROM expenses e JOIN users u ON e.payer_id = u.id
            WHERE e.flat_id = ? ORDER BY e.timestamp DESC""",
@@ -90,10 +114,15 @@ def delete_expense(flat_id, expense_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
-    expense = db.execute("SELECT id FROM expenses WHERE id = ? AND flat_id = ?", (expense_id, flat_id)).fetchone()
+    expense = db.execute("SELECT id, payer_id FROM expenses WHERE id = ? AND flat_id = ?", (expense_id, flat_id)).fetchone()
     if not expense:
         db.close()
         return jsonify({"error": "Expense not found"}), 404
+
+    # Only the person who logged the expense (payer) can delete it
+    if expense["payer_id"] != request.user_id:
+        db.close()
+        return jsonify({"error": "Only the person who logged this expense can delete it"}), 403
 
     db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
     db.commit()

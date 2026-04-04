@@ -224,9 +224,11 @@ All tables use UUID primary keys for global uniqueness and security.
 
 ### Creating a Shared Expense
 1. User creates expense record in `expenses` table
-2. System calculates equal shares
-3. System creates records in `expense_shares` for each sharer
+2. System splits among selected members (user can deselect themselves)
+3. System creates records in `expense_shares` for each selected sharer
 4. Debts are calculated from expense_shares (sharer owes payer their share amount)
+5. If payer deselects themselves, the full amount is owed by the selected members
+6. Users can only log expenses they paid for — prevents duplicate entries
 
 ### Settlement Process
 1. User proposes settlement in `settlements` table (status: 'pending')

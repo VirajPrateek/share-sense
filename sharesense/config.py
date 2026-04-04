@@ -10,13 +10,15 @@ if _env_file.exists():
             key, val = line.split("=", 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-# If DATABASE_URL is set, use Postgres. Otherwise fall back to SQLite.
+# Supabase Postgres connection
 DATABASE_URL = os.environ.get("DATABASE_URL")
-
-# SQLite fallback for local dev
-_default_db = "/tmp/sharesense.db" if os.environ.get("VERCEL") else "sharesense.db"
-DATABASE_PATH = os.environ.get("DATABASE_PATH", _default_db)
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required")
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 JWT_EXPIRES_HOURS = int(os.environ.get("JWT_EXPIRES_HOURS", "168"))
 PORT = int(os.environ.get("PORT", "3000"))
+
+# Gemini API key for receipt parsing (optional)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
