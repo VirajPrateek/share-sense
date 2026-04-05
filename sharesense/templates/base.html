@@ -522,6 +522,23 @@ async function deleteExpense(fid,eid){
 
 let _receiptItems=[];
 
+// ── Loading overlay for receipt scanning ──
+function showScanOverlay(){
+    let ov=document.getElementById('scan-overlay');
+    if(ov) return;
+    ov=document.createElement('div');
+    ov.id='scan-overlay';
+    ov.className='fixed inset-0 z-[100] bg-on-surface/40 backdrop-blur-sm flex flex-col items-center justify-center gap-4';
+    ov.innerHTML='<div class="w-14 h-14 rounded-2xl bg-brand flex items-center justify-center animate-pulse"><span class="material-symbols-outlined text-white text-[28px]">document_scanner</span></div>'
+        +'<p class="text-white font-headline font-bold text-sm">Scanning receipt...</p>'
+        +'<p class="text-white/70 text-xs">This may take a few seconds</p>';
+    document.body.appendChild(ov);
+}
+function hideScanOverlay(){
+    const ov=document.getElementById('scan-overlay');
+    if(ov) ov.remove();
+}
+
 // Resize image client-side before sending to Gemini (saves bandwidth + tokens)
 function resizeImage(dataUrl, maxWidth=1024){
     return new Promise(res=>{
@@ -543,8 +560,8 @@ function resizeImage(dataUrl, maxWidth=1024){
 async function handleReceiptUpload(input){
     const file=input.files&&input.files[0];
     if(!file) return;
+    showScanOverlay();
     const status=document.getElementById('receipt-status');
-    if(status) status.textContent='Resizing & scanning...';
 
     try{
         let b64=await new Promise((res,rej)=>{
@@ -553,21 +570,34 @@ async function handleReceiptUpload(input){
             r.onerror=rej;
             r.readAsDataURL(file);
         });
-        // Resize to 1024px wide — keeps text readable, cuts size ~80%
         b64=await resizeImage(b64, 1024);
         const d=await api('/api/parse-receipt',{method:'POST',body:JSON.stringify({image:b64,mimeType:'image/jpeg'})});
+        hideScanOverlay();
         if(d.error&&d.items&&d.items.length===0){
             if(status) status.textContent=d.error;
             return;
         }
-        _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other'}));
+        // Each item gets its own sharers list (default: all members selected)
+        const allIds=(flatCache.members||[]).map(m=>m.id);
+        _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other',sharers:[...allIds]}));
         renderReceiptTable();
         if(d.category && d.category!=='other') _splitState.category=d.category;
-        if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — edit below then confirm</span>';
+        if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — assign splits then confirm</span>';
     }catch(err){
+        hideScanOverlay();
         if(status) status.textContent=err.message||'Failed to scan receipt';
     }
     input.value='';
+}
+
+function toggleReceiptItemSharer(itemIdx, memberId){
+    const it=_receiptItems[itemIdx];
+    if(!it) return;
+    const idx=it.sharers.indexOf(memberId);
+    if(idx===-1) it.sharers.push(memberId);
+    else if(it.sharers.length>1) it.sharers.splice(idx,1); // keep at least 1
+    else { showMsg('At least one person must be selected'); return; }
+    renderReceiptTable();
 }
 
 function renderReceiptTable(){
@@ -575,6 +605,7 @@ function renderReceiptTable(){
     if(!el) return;
     if(_receiptItems.length===0){ el.innerHTML=''; return; }
 
+    const members=flatCache.members||[];
     let total=0;
     let h='<div class="bg-surface-card rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] overflow-hidden">';
 
@@ -586,17 +617,27 @@ function renderReceiptTable(){
     h+='<span class="material-symbols-outlined text-[14px]">check</span>Confirm</button></div>';
 
     // Items
-    h+='<div class="divide-y divide-surface-low">';
     _receiptItems.forEach((it,i)=>{
         total+=it.price;
-        h+='<div class="flex items-center gap-3 px-5 py-3">';
+        h+='<div class="px-5 py-3 border-b border-surface-low">';
+        // Row 1: name, price, delete
+        h+='<div class="flex items-center gap-3">';
         h+='<div class="flex-1 min-w-0"><input class="w-full bg-transparent border-none p-0 text-xs font-medium text-on-surface focus:ring-0 placeholder:text-on-surface-light/40" value="'+esc(it.name)+'" placeholder="Item name" onchange="updateReceiptItem('+i+',\'name\',this.value)"></div>';
         h+='<div class="w-20 flex items-center gap-0.5"><span class="text-[10px] text-on-surface-light">'+CUR+'</span><input class="w-full bg-transparent border-none p-0 text-xs font-bold text-on-surface text-right focus:ring-0" type="number" step="0.01" value="'+it.price.toFixed(2)+'" onchange="updateReceiptItem('+i+',\'price\',this.value)"></div>';
         h+='<button onclick="removeReceiptItem('+i+')" class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors">';
         h+='<span class="material-symbols-outlined text-danger text-[14px]">close</span></button>';
         h+='</div>';
+        // Row 2: mini avatar toggles for split assignment
+        h+='<div class="flex gap-2 mt-2">';
+        members.forEach(m=>{
+            const sel=it.sharers.includes(m.id);
+            const initial=m.name.charAt(0).toUpperCase();
+            const cls=sel?'bg-brand text-white':'bg-surface-low text-on-surface-light';
+            h+='<button onclick="toggleReceiptItemSharer('+i+',\''+m.id+'\')" class="w-7 h-7 rounded-full '+cls+' text-[10px] font-bold transition-all active:scale-90" title="'+esc(m.name)+'">'+initial+'</button>';
+        });
+        h+='</div>';
+        h+='</div>';
     });
-    h+='</div>';
 
     // Total
     h+='<div class="flex items-center justify-between px-5 py-3 bg-surface-low">';
@@ -619,23 +660,46 @@ function removeReceiptItem(idx){
     renderReceiptTable();
 }
 
-function confirmReceiptItems(){
+async function confirmReceiptItems(){
     if(_receiptItems.length===0) return;
-    let total=0;
-    const parts=[];
+    const fid=flatCache.flatId;
+    if(!fid){ showMsg('No flat selected'); return; }
+
+    // Group items by their sharer set (same sharers = same expense)
+    const groups={};
     _receiptItems.forEach(it=>{
-        total+=it.price;
-        if(it.name) parts.push(it.name+'('+it.price.toFixed(2)+')');
+        const key=it.sharers.slice().sort().join(',');
+        if(!groups[key]) groups[key]={sharers:it.sharers,items:[],total:0,category:it.category||'other'};
+        groups[key].items.push(it);
+        groups[key].total+=it.price;
     });
-    const amtEl=document.getElementById('e-amount');
-    const descEl=document.getElementById('e-desc');
-    if(amtEl) amtEl.value=total.toFixed(2);
-    if(descEl) descEl.value=parts.join(', ');
-    _receiptItems=[];
-    renderReceiptTable();
-    updateSplitSummary();
-    showMsg('Items confirmed — review and submit','success');
+
+    const groupList=Object.values(groups);
+    let submitted=0;
+
+    try{
+        for(const g of groupList){
+            const desc=g.items.map(it=>it.name+'('+it.price.toFixed(2)+')').join(', ');
+            await api('/api/flats/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
+                description:desc,
+                amount:round2(g.total),
+                sharerIds:g.sharers,
+                category:g.category
+            })});
+            submitted++;
+        }
+        _receiptItems=[];
+        renderReceiptTable();
+        const amtEl=document.getElementById('e-amount');
+        const descEl=document.getElementById('e-desc');
+        if(amtEl) amtEl.value='';
+        if(descEl) descEl.value='';
+        showMsg(submitted+' expense(s) added from receipt!','success');
+        flatDetailPage(fid,'expenses');
+    }catch(err){ showMsg(err.message); }
 }
+
+function round2(n){ return Math.round(n*100)/100; }
 
 // ── Settlements Tab ──
 let _settleState={debtorId:null,creditorId:null};
