@@ -47,6 +47,8 @@ def init_db():
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             created_by TEXT REFERENCES users(id),
+            join_code TEXT UNIQUE,
+            status TEXT DEFAULT 'active',
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         );

@@ -32,6 +32,8 @@ CREATE TABLE groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   created_by UUID REFERENCES users(id),
+  join_code VARCHAR(8) UNIQUE NOT NULL,
+  status VARCHAR(20) DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -101,6 +103,8 @@ CREATE TABLE expense_durations (
 
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_groups_created_by ON groups(created_by);
+CREATE INDEX idx_groups_join_code ON groups(join_code);
+CREATE INDEX idx_groups_status ON groups(status);
 CREATE INDEX idx_group_members_group_id ON group_members(group_id);
 CREATE INDEX idx_group_members_user_id ON group_members(user_id);
 CREATE INDEX idx_expenses_payer_id ON expenses(payer_id);

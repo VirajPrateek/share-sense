@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link href="/static/style.css" rel="stylesheet">
     <script defer src="/_vercel/insights/script.js"></script>
     <script defer src="/_vercel/speed-insights/script.js"></script>
@@ -34,11 +34,22 @@
             <span class="material-symbols-outlined text-brand" id="topbar-left-icon">home_work</span>
         </button>
         <h1 class="font-headline lowercase text-base tracking-tight font-bold text-brand">sharesense</h1>
-        <button onclick="logout()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors">
-            <span class="material-symbols-outlined text-brand text-[20px]">logout</span>
+        <button onclick="toggleMenu()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors">
+            <span class="material-symbols-outlined text-brand text-[20px]">menu</span>
         </button>
     </div>
 </header>
+
+<!-- Slide-out Menu -->
+<div id="side-menu" class="fixed inset-0 z-[60] hidden">
+    <div class="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onclick="toggleMenu()"></div>
+    <div class="absolute right-0 top-0 h-full w-64 bg-surface shadow-xl p-6 pt-16 space-y-4">
+        <div id="menu-user" class="mb-4"></div>
+        <div id="menu-items"></div>
+        <button onclick="logout();toggleMenu()" class="w-full py-3 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2 mt-6">
+            <span class="material-symbols-outlined text-[18px]">logout</span>Logout</button>
+    </div>
+</div>
 
 <!-- Main Content -->
 <main id="app" class="pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6"></main>
@@ -60,14 +71,19 @@ function esc(s){ const d=document.createElement('div'); d.textContent=s; return 
 async function logout(){ clearAuth(); hideChrome(); route(); }
 
 function showChrome(){ document.getElementById('topbar').style.display=''; }
-function hideChrome(){ document.getElementById('topbar').style.display='none'; document.getElementById('footer-nav').style.display='none'; }
+function hideChrome(){ document.getElementById('topbar').style.display='none'; document.getElementById('footer-nav').style.display='none'; document.getElementById('side-menu').classList.add('hidden'); }
 
-function showMsg(text, type='error'){
-    const ex=document.getElementById('toast'); if(ex) ex.remove();
-    const cls = type==='success' ? 'bg-brand text-white' : 'bg-danger text-white';
-    const d=document.createElement('div'); d.id='toast';
-    d.className='fixed top-16 left-1/2 -translate-x-1/2 z-[99] px-4 py-2 rounded-lg text-xs font-medium shadow-lg '+cls;
-    d.textContent=text; document.body.appendChild(d); setTimeout(()=>d.remove(),3000);
+function toggleMenu(){
+    const m=document.getElementById('side-menu');
+    m.classList.toggle('hidden');
+    if(S.user){
+        document.getElementById('menu-user').innerHTML='<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand">person</span></div><div><p class="text-sm font-bold">'+esc(S.user.name||'')+'</p><p class="text-[10px] text-on-surface-light">'+esc(S.user.email||'')+'</p></div></div>';
+    }
+    let items='';
+    if(S.groupId && groupCache.groupId===S.groupId){
+        items+='<button onclick="switchTab(\''+S.groupId+'\',\'members\');toggleMenu()" class="w-full py-2.5 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors"><span class="material-symbols-outlined text-[18px]">group</span>Members & Settings</button>';
+    }
+    document.getElementById('menu-items').innerHTML=items;
 }
 
 function showFooter(groupId, tab){
@@ -77,7 +93,6 @@ function showFooter(groupId, tab){
         {id:'ledger',icon:'account_balance_wallet',label:'ledger'},
         {id:'expenses',icon:'receipt_long',label:'split'},
         {id:'settlements',icon:'handshake',label:'settle'},
-        {id:'members',icon:'home_work',label:'house'}
     ];
     const inner=nav.querySelector('div');
     inner.innerHTML=tabs.map(t=>{
@@ -88,6 +103,15 @@ function showFooter(groupId, tab){
     }).join('');
     nav.style.display='';
 }
+
+function showMsg(text, type='error'){
+    const ex=document.getElementById('toast'); if(ex) ex.remove();
+    const cls = type==='success' ? 'bg-brand text-white' : 'bg-danger text-white';
+    const d=document.createElement('div'); d.id='toast';
+    d.className='fixed top-16 left-1/2 -translate-x-1/2 z-[99] px-4 py-2 rounded-lg text-xs font-medium shadow-lg '+cls;
+    d.textContent=text; document.body.appendChild(d); setTimeout(()=>d.remove(),3000);
+}
+
 function switchTab(fid,tab){ groupDetailPage(fid,tab); }
 
 // ── Auth Pages ──
@@ -112,7 +136,7 @@ function loginPage(){
 }
 async function handleLogin(e){
     e.preventDefault();
-    try{ const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:document.getElementById('l-email').value,password:document.getElementById('l-pass').value})}); setAuth(d.token,d.user); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
+    try{ const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:document.getElementById('l-email').value,password:document.getElementById('l-pass').value})}); setAuth(d.token,d.user); location.hash='#dashboard'; route(); }catch(err){ showMsg(err.message); }
 }
 function registerPage(){
     hideChrome();
@@ -136,7 +160,7 @@ function registerPage(){
 }
 async function handleRegister(e){
     e.preventDefault();
-    try{ await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:document.getElementById('r-name').value,email:document.getElementById('r-email').value,password:document.getElementById('r-pass').value})}); showMsg('Registered! Please login.','success'); location.hash='#login'; }catch(err){ showMsg(err.message); }
+    try{ await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:document.getElementById('r-name').value,email:document.getElementById('r-email').value,password:document.getElementById('r-pass').value})}); showMsg('Registered! Please login.','success'); location.hash='#login'; route(); }catch(err){ showMsg(err.message); }
 }
 </script>
 
@@ -151,7 +175,9 @@ async function dashboardPage(){
         const d=await api('/api/groups');
         let h='<section class="space-y-4">';
         h+='<div class="flex items-center justify-between"><h2 class="font-headline text-xl font-bold tracking-tight">My Groups</h2>';
-        h+='<button onclick="location.hash=\'#new-group\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div>';
+        h+='<div class="flex items-center gap-3">';
+        h+='<button onclick="showJoinDialog()" class="text-on-surface-light text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">login</span>Join</button>';
+        h+='<button onclick="location.hash=\'#new-group\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div></div>';
         if(d.groups.length===0){
             h+='<div class="bg-surface-card rounded-2xl p-8 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center"><span class="material-symbols-outlined text-4xl text-on-surface-light mb-2">home_work</span><p class="text-on-surface-light text-xs">No groups yet. Create one!</p></div>';
         } else {
@@ -186,6 +212,14 @@ async function handleCreateGroup(e){
     try{ await api('/api/groups',{method:'POST',body:JSON.stringify({name:document.getElementById('g-name').value})}); showMsg('Group created!','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
 }
 
+function showJoinDialog(){
+    const code=prompt('Enter 6-character join code:');
+    if(!code||code.trim().length!==6){ if(code!==null) showMsg('Code must be 6 characters'); return; }
+    api('/api/groups/join',{method:'POST',body:JSON.stringify({code:code.trim()})})
+        .then(d=>{ showMsg('Joined group!','success'); location.hash='#group/'+d.groupId; })
+        .catch(err=>showMsg(err.message));
+}
+
 // ── Group Detail ──
 async function groupDetailPage(fid,tab){
     tab=tab||'ledger';
@@ -212,8 +246,9 @@ async function groupDetailPage(fid,tab){
 
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
     try{
-        const [fd,md]=await Promise.all([api('/api/groups/'+fid),api('/api/groups/'+fid+'/members')]);
-        groupCache={group:fd.group,members:md.members,groupId:fid};
+        // Fetch group, members, and balances all in parallel
+        const [fd,md,bd]=await Promise.all([api('/api/groups/'+fid),api('/api/groups/'+fid+'/members'),api('/api/groups/'+fid+'/balances')]);
+        groupCache={group:fd.group,members:md.members,groupId:fid,balances:bd};
         let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
         h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(fd.group.name)+'</h2></div>';
         h+='<div id="tab-content"></div>';
@@ -232,7 +267,9 @@ async function groupDetailPage(fid,tab){
 async function renderLedger(fid){
     const el=document.getElementById('tab-content');
     try{
-        const [bd]=await Promise.all([api('/api/groups/'+fid+'/balances')]);
+        // Use cached balances if available, otherwise fetch
+        const bd=groupCache.balances||await api('/api/groups/'+fid+'/balances');
+        groupCache.balances=null; // clear after use so next visit refreshes
         const transfers=bd.transfers||[];
         const members=groupCache.members||[];
 
@@ -281,7 +318,7 @@ async function renderLedger(fid){
             h+='</div></div>';
         }
 
-        // Activity timeline with filters
+        // Activity section — lazy loaded on demand
         h+='<div class="space-y-3 mt-4">';
         h+='<div class="flex items-center justify-between"><h3 class="font-headline text-base font-bold tracking-tight">Activity</h3>';
         h+='<button onclick="document.getElementById(\'activity-filters\').classList.toggle(\'hidden\')" class="text-brand text-xs font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">filter_list</span>Filter</button></div>';
@@ -302,13 +339,13 @@ async function renderLedger(fid){
         h+='<button onclick="loadActivity(\''+fid+'\')" class="w-full py-2 bg-brand text-white rounded-lg text-xs font-semibold active:scale-[0.98] transition-transform">Apply Filters</button>';
         h+='</div>';
 
-        // Activity list container
-        h+='<div id="activity-list"><div class="text-center py-4 text-on-surface-light text-xs">Loading activity...</div></div>';
+        // Show activity button (loads on demand)
+        h+='<div id="activity-list">';
+        h+='<button onclick="loadActivity(\''+fid+'\')" class="w-full py-3 rounded-xl bg-surface-card shadow-[0_2px_10px_rgba(24,29,28,0.02)] text-brand text-xs font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"><span class="material-symbols-outlined text-[18px]">expand_more</span>Show Activity</button>';
+        h+='</div>';
         h+='</div>';
 
         el.innerHTML=h;
-        // Load activity feed
-        loadActivity(fid);
     }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading data</p>'; }
 }
 
@@ -481,7 +518,6 @@ function renderSplitMembers(){
 async function renderExpenses(fid){
     const el=document.getElementById('tab-content');
     try{
-        const d=await api('/api/groups/'+fid+'/expenses');
         const m=groupCache.members||[];
         _splitState={selectedMembers:m.map(x=>x.id),payerId:S.user.id,amount:0,category:'other'};
 
@@ -541,23 +577,6 @@ async function renderExpenses(fid){
         // ── Add to Ledger Button ──
         h+='<button onclick="submitExpense(\''+fid+'\')" class="w-full py-4 rounded-2xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-extrabold text-base shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-8">';
         h+='<span>Add to Ledger</span><span class="material-symbols-outlined">arrow_forward</span></button>';
-
-        // ── Expense History ──
-        h+='<section class="space-y-2">';
-        h+='<h3 class="font-headline text-sm font-bold">Recent Expenses</h3>';
-        if(d.expenses.length===0){
-            h+='<p class="text-center text-on-surface-light text-xs py-6">No expenses yet. Add your first one above.</p>';
-        } else {
-            d.expenses.forEach(e=>{
-                const icon=getCatIcon(e.description, e.category);
-                h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
-                h+='<div class="w-9 h-9 rounded-lg bg-brand-light flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icon+'</span></div>';
-                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(e.description)+'</p><p class="text-[10px] text-on-surface-light">'+esc(e.payer_name)+' &middot; '+new Date(e.timestamp).toLocaleDateString()+'</p></div>';
-                h+='<div class="text-right flex items-center gap-1.5 flex-shrink-0"><p class="font-headline text-xs font-bold">'+CUR+parseFloat(e.amount).toFixed(2)+'</p>';
-                h+='<button onclick="deleteExpense(\''+fid+'\',\''+e.id+'\')" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[16px]">close</span></button></div></div>';
-            });
-        }
-        h+='</section>';
 
         el.innerHTML=h;
         renderSplitMembers();
@@ -976,32 +995,76 @@ async function confirmSettlement(fid,sid){
 // ── Members Tab ──
 function renderMembers(fid){
     const m=groupCache.members||[];
-    let h='<div class="space-y-2">';
+    const g=groupCache.group||{};
+    const amAdmin=g.created_by===S.user.id;
+
+    let h='';
+
+    // Join code card
+    if(g.join_code){
+        h+='<div class="bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center mb-4">';
+        h+='<p class="text-on-surface-light text-[10px] font-bold uppercase tracking-wider mb-2">Invite Code</p>';
+        h+='<p class="font-headline text-2xl font-extrabold text-brand tracking-[0.3em] cursor-pointer" onclick="navigator.clipboard.writeText(\''+esc(g.join_code)+'\');showMsg(\'Code copied!\',\'success\')">'+esc(g.join_code)+'</p>';
+        h+='<p class="text-on-surface-light text-[10px] mt-2">Tap code to copy · Share so others can join</p>';
+        h+='</div>';
+    }
+
+    // Member list
+    h+='<div class="space-y-2">';
     h+='<h3 class="font-headline text-sm font-bold">Members ('+m.length+')</h3>';
     m.forEach(x=>{
+        const isCreator=x.id===g.created_by;
         h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
         h+='<div class="w-9 h-9 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">person</span></div>';
-        h+='<div class="flex-1"><p class="text-xs font-bold">'+esc(x.name)+'</p><p class="text-[10px] text-on-surface-light">'+esc(x.email)+'</p></div>';
-        if(x.id!==S.user.id) h+='<button onclick="removeMember(\''+fid+'\',\''+x.id+'\')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[18px]">person_remove</span></button>';
-        else h+='<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-light text-brand">You</span>';
+        h+='<div class="flex-1"><p class="text-xs font-bold">'+esc(x.name)+(isCreator?' <span class="text-[9px] text-on-surface-light font-normal">admin</span>':'')+'</p><p class="text-[10px] text-on-surface-light">'+esc(x.email)+'</p></div>';
+        if(x.id===S.user.id) h+='<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-light text-brand">You</span>';
+        else if(amAdmin) h+='<button onclick="removeMember(\''+fid+'\',\''+x.id+'\')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[18px]">person_remove</span></button>';
         h+='</div>';
     });
     h+='</div>';
-    h+='<div class="bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-3 mt-4">';
-    h+='<h3 class="font-headline text-sm font-bold">Add Member</h3>';
-    h+='<form onsubmit="handleAddMember(event,\''+fid+'\')" class="flex gap-2">';
-    h+='<input type="email" id="add-email" placeholder="Email address" class="flex-1 px-3 py-2.5 rounded-xl bg-surface-low border-none text-xs focus:ring-2 focus:ring-brand/30">';
-    h+='<button class="px-4 py-2.5 bg-brand text-white rounded-xl text-xs font-semibold active:scale-95 transition-transform" type="submit">Add</button>';
-    h+='</form></div>';
+
+    // Add member (admin only)
+    if(amAdmin){
+        h+='<div class="bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-3 mt-4">';
+        h+='<h3 class="font-headline text-sm font-bold">Add Member</h3>';
+        h+='<form onsubmit="handleAddMember(event,\''+fid+'\')" class="flex gap-2">';
+        h+='<input type="email" id="add-email" placeholder="Email address" class="flex-1 px-3 py-2.5 rounded-xl bg-surface-low border-none text-xs focus:ring-2 focus:ring-brand/30">';
+        h+='<button class="px-4 py-2.5 bg-brand text-white rounded-xl text-xs font-semibold active:scale-95 transition-transform" type="submit">Add</button>';
+        h+='</form></div>';
+    }
+
+    // Admin actions: archive / delete
+    if(amAdmin){
+        h+='<div class="mt-6 space-y-2">';
+        h+='<h3 class="font-headline text-sm font-bold text-on-surface-light">Admin</h3>';
+        h+='<button onclick="archiveGroup(\''+fid+'\')" class="w-full py-3 rounded-xl bg-surface-low text-on-surface-light text-xs font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"><span class="material-symbols-outlined text-[18px]">archive</span>Archive Group</button>';
+        h+='<button onclick="deleteGroup(\''+fid+'\')" class="w-full py-3 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"><span class="material-symbols-outlined text-[18px]">delete</span>Delete Group</button>';
+        h+='</div>';
+    } else {
+        // Non-admin can leave
+        h+='<div class="mt-6">';
+        h+='<button onclick="removeMember(\''+fid+'\',\''+S.user.id+'\')" class="w-full py-3 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"><span class="material-symbols-outlined text-[18px]">logout</span>Leave Group</button>';
+        h+='</div>';
+    }
+
     document.getElementById('tab-content').innerHTML=h;
 }
 async function handleAddMember(e,fid){
     e.preventDefault();
-    try{ await api('/api/groups/'+fid+'/members',{method:'POST',body:JSON.stringify({email:document.getElementById('add-email').value})}); showMsg('Added!','success'); groupDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
+    try{ await api('/api/groups/'+fid+'/members',{method:'POST',body:JSON.stringify({email:document.getElementById('add-email').value})}); showMsg('Added!','success'); groupCache={}; groupDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
 }
 async function removeMember(fid,uid){
-    if(!confirm('Remove this member?')) return;
-    try{ await api('/api/groups/'+fid+'/members/'+uid,{method:'DELETE'}); showMsg('Removed','success'); groupDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
+    const isSelf=uid===S.user.id;
+    if(!confirm(isSelf?'Leave this group?':'Remove this member?')) return;
+    try{ await api('/api/groups/'+fid+'/members/'+uid,{method:'DELETE'}); showMsg(isSelf?'Left group':'Removed','success'); if(isSelf) location.hash='#dashboard'; else { groupCache={}; groupDetailPage(fid,'members'); } }catch(err){ showMsg(err.message); }
+}
+async function archiveGroup(fid){
+    if(!confirm('Archive this group? It will be hidden from the dashboard.')) return;
+    try{ await api('/api/groups/'+fid+'/archive',{method:'POST'}); showMsg('Group archived','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
+}
+async function deleteGroup(fid){
+    if(!confirm('Permanently delete this group and all its data? This cannot be undone.')) return;
+    try{ await api('/api/groups/'+fid,{method:'DELETE'}); showMsg('Group deleted','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
 }
 
 // ── Router ──
