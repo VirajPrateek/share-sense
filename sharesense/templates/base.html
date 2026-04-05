@@ -563,6 +563,9 @@ async function renderExpenses(fid){
         // ── Receipt Items Table (populated after scan) ──
         h+='<div id="receipt-table" class="mb-5"></div>';
 
+        // ── Manual entry sections (hidden when receipt is active) ──
+        h+='<div id="manual-entry-sections">';
+
         // ── Description ──
         h+='<section class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] mb-5">';
         h+='<label class="text-on-surface-light font-headline font-bold text-[10px] uppercase tracking-[0.1em] mb-2 block">What was it for?</label>';
@@ -585,8 +588,10 @@ async function renderExpenses(fid){
         h+='</section>';
 
         // ── Add to Ledger Button ──
-        h+='<button onclick="submitExpense(\''+fid+'\')" class="w-full py-4 rounded-2xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-extrabold text-base shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-8">';
+        h+='<button id="manual-submit-btn" onclick="submitExpense(\''+fid+'\')" class="w-full py-4 rounded-2xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-extrabold text-base shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-8">';
         h+='<span>Add to Ledger</span><span class="material-symbols-outlined">arrow_forward</span></button>';
+
+        h+='</div>'; // end manual-entry-sections
 
         el.innerHTML=h;
         renderSplitMembers();
@@ -685,6 +690,9 @@ async function handleReceiptUpload(input){
         _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other',sharers:[...allIds]}));
         renderReceiptTable();
         if(d.category && d.category!=='other') _splitState.category=d.category;
+        // Hide manual entry sections — receipt handles splits at item level
+        const manualSections=document.getElementById('manual-entry-sections');
+        if(manualSections) manualSections.style.display='none';
         if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — assign splits then confirm</span>';
     }catch(err){
         hideScanOverlay();
@@ -706,7 +714,13 @@ function toggleReceiptItemSharer(itemIdx, memberId){
 function renderReceiptTable(){
     const el=document.getElementById('receipt-table');
     if(!el) return;
-    if(_receiptItems.length===0){ el.innerHTML=''; return; }
+    if(_receiptItems.length===0){
+        el.innerHTML='';
+        // Restore manual entry sections
+        const manualSections=document.getElementById('manual-entry-sections');
+        if(manualSections) manualSections.style.display='';
+        return;
+    }
 
     const members=groupCache.members||[];
     let total=0;
@@ -716,8 +730,7 @@ function renderReceiptTable(){
     h+='<div class="flex items-center justify-between px-5 py-3 bg-brand-light/50">';
     h+='<div class="flex items-center gap-2"><span class="material-symbols-outlined text-brand text-[18px]">receipt_long</span>';
     h+='<span class="font-headline font-bold text-xs text-brand">Scanned Items ('+_receiptItems.length+')</span></div>';
-    h+='<button onclick="confirmReceiptItems()" class="px-3 py-1.5 bg-brand text-white rounded-lg text-[10px] font-bold active:scale-95 transition-transform flex items-center gap-1">';
-    h+='<span class="material-symbols-outlined text-[14px]">check</span>Confirm</button></div>';
+    h+='</div>';
 
     // Items
     _receiptItems.forEach((it,i)=>{
@@ -748,6 +761,11 @@ function renderReceiptTable(){
     h+='<span class="font-headline font-bold text-sm text-brand">'+CUR+total.toFixed(2)+'</span></div>';
 
     h+='</div>';
+
+    // Review Split CTA — below the table
+    h+='<button onclick="reviewReceiptSplit()" class="w-full mt-4 py-4 rounded-2xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-extrabold text-base shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">';
+    h+='<span>Review Split</span><span class="material-symbols-outlined text-[20px]">fact_check</span></button>';
+
     el.innerHTML=h;
 }
 
@@ -763,12 +781,91 @@ function removeReceiptItem(idx){
     renderReceiptTable();
 }
 
-async function confirmReceiptItems(){
+function reviewReceiptSplit(){
+    if(_receiptItems.length===0) return;
+    const fid=groupCache.groupId;
+    if(!fid){ showMsg('No group selected'); return; }
+    const members=groupCache.members||[];
+    const memberMap={};
+    members.forEach(m=>memberMap[m.id]=m.name);
+
+    // Group items by sharer set
+    const groups={};
+    _receiptItems.forEach(it=>{
+        const key=it.sharers.slice().sort().join(',');
+        if(!groups[key]) groups[key]={sharers:it.sharers,items:[],total:0,category:it.category||'other'};
+        groups[key].items.push(it);
+        groups[key].total+=it.price;
+    });
+    const groupList=Object.values(groups);
+
+    // Replace the receipt-table content with the review summary
+    const el=document.getElementById('receipt-table');
+    let grandTotal=0;
+    let h='<div class="bg-surface-card rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] overflow-hidden">';
+
+    // Header
+    h+='<div class="px-5 py-3 bg-brand-light/50">';
+    h+='<div class="flex items-center gap-2"><span class="material-symbols-outlined text-brand text-[18px]">fact_check</span>';
+    h+='<span class="font-headline font-bold text-xs text-brand">Split Summary ('+groupList.length+' expense'+(groupList.length>1?'s':'')+')</span></div>';
+    h+='</div>';
+
+    groupList.forEach((g,gi)=>{
+        grandTotal+=g.total;
+        const sharerNames=g.sharers.map(id=>id===S.user.id?'You':(memberMap[id]||'?'));
+        const perPerson=g.total/g.sharers.length;
+        const payerInSplit=g.sharers.includes(S.user.id);
+
+        h+='<div class="px-5 py-4'+(gi>0?' border-t border-surface-low':'')+'">';
+
+        // Items in this group
+        h+='<p class="text-[10px] text-on-surface-light mb-1">Items:</p>';
+        g.items.forEach(it=>{
+            h+='<div class="flex justify-between text-xs"><span class="text-on-surface">'+esc(it.name)+'</span><span class="font-bold">'+CUR+it.price.toFixed(2)+'</span></div>';
+        });
+
+        // Total for this group
+        h+='<div class="flex justify-between text-xs font-bold mt-2 pt-2 border-t border-surface-low"><span>Subtotal</span><span class="text-brand">'+CUR+round2(g.total).toFixed(2)+'</span></div>';
+
+        // Split info
+        h+='<div class="mt-2 p-2.5 bg-surface-low rounded-lg">';
+        h+='<p class="text-[10px] text-on-surface-light mb-1">Split between: '+sharerNames.join(', ')+'</p>';
+        g.sharers.forEach(id=>{
+            if(id===S.user.id) return;
+            const name=memberMap[id]||'?';
+            h+='<div class="flex justify-between text-[11px]"><span>'+esc(name)+' owes</span><span class="font-bold text-brand">'+CUR+round2(perPerson).toFixed(2)+'</span></div>';
+        });
+        if(!payerInSplit){
+            h+='<p class="text-[10px] text-on-surface-light mt-1">Full amount owed back to you</p>';
+        }
+        h+='</div>';
+
+        h+='</div>';
+    });
+
+    // Grand total
+    h+='<div class="px-5 py-3 bg-surface-low">';
+    h+='<div class="flex justify-between font-headline font-bold"><span>Grand Total</span><span class="text-brand text-lg">'+CUR+round2(grandTotal).toFixed(2)+'</span></div>';
+    h+='</div>';
+
+    h+='</div>';
+
+    // Action buttons below the summary
+    h+='<div class="flex gap-3 mt-4">';
+    h+='<button onclick="renderReceiptTable()" class="flex-1 py-3.5 rounded-xl bg-surface-card border border-brand/20 text-brand font-headline font-bold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2">';
+    h+='<span class="material-symbols-outlined text-[18px]">edit</span>Edit</button>';
+    h+='<button onclick="submitReceiptExpenses()" class="flex-1 py-3.5 rounded-xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-bold text-sm shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">';
+    h+='<span>Add to Ledger</span><span class="material-symbols-outlined text-[18px]">arrow_forward</span></button>';
+    h+='</div>';
+
+    el.innerHTML=h;
+}
+
+async function submitReceiptExpenses(){
     if(_receiptItems.length===0) return;
     const fid=groupCache.groupId;
     if(!fid){ showMsg('No group selected'); return; }
 
-    // Group items by their sharer set (same sharers = same expense)
     const groups={};
     _receiptItems.forEach(it=>{
         const key=it.sharers.slice().sort().join(',');
@@ -798,7 +895,7 @@ async function confirmReceiptItems(){
         if(amtEl) amtEl.value='';
         if(descEl) descEl.value='';
         showMsg(submitted+' expense(s) added from receipt!','success');
-        groupDetailPage(fid,'expenses');
+        groupCache={}; groupDetailPage(fid,'expenses');
     }catch(err){ showMsg(err.message); }
 }
 
