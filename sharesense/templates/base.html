@@ -401,7 +401,7 @@ async function loadActivity(fid){
                 h+='<div class="bg-surface-card rounded-xl p-3.5 shadow-[0_2px_10px_rgba(24,29,28,0.02)] space-y-2">';
                 h+='<div class="flex items-center gap-3">';
                 h+='<div class="w-9 h-9 rounded-lg bg-surface-low flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icon+'</span></div>';
-                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(a.description)+'</p>';
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate cursor-pointer" onclick="this.classList.toggle(\'truncate\')" title="Tap to expand">'+esc(a.description)+'</p>';
                 h+='<p class="text-[10px] text-on-surface-light">Paid by '+(isYou?'You':esc(a.payer_name))+'</p></div>';
                 h+='<p class="font-headline text-sm font-bold '+(isYou?'text-brand':'text-on-surface')+'">'+CUR+a.amount.toFixed(2)+'</p>';
                 h+='</div>';
