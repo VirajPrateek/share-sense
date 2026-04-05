@@ -96,11 +96,13 @@ def get_expenses(flat_id):
         return jsonify({"error": "Access denied"}), 403
 
     rows = db.execute(
-        """SELECT e.id, e.amount, e.description, e.payer_id, e.expense_type, e.category, e.timestamp, e.created_at,
+        """SELECT DISTINCT e.id, e.amount, e.description, e.payer_id, e.expense_type, e.category, e.timestamp, e.created_at,
                   u.name as payer_name
            FROM expenses e JOIN users u ON e.payer_id = u.id
-           WHERE e.flat_id = ? ORDER BY e.timestamp DESC""",
-        (flat_id,),
+           LEFT JOIN expense_shares es ON e.id = es.expense_id
+           WHERE e.flat_id = ? AND (e.payer_id = ? OR es.sharer_id = ?)
+           ORDER BY e.timestamp DESC""",
+        (flat_id, request.user_id, request.user_id),
     ).fetchall()
     db.close()
     return jsonify({"expenses": [dict(r) for r in rows]}), 200

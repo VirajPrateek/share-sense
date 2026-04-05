@@ -29,7 +29,8 @@ _dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def create_app():
-    app = Flask(__name__, template_folder=os.path.join(_dir, "templates"))
+    app = Flask(__name__, template_folder=os.path.join(_dir, "templates"),
+                static_folder=os.path.join(_dir, "static"), static_url_path="/static")
     app.json_provider_class = _SafeJSON
     app.json = _SafeJSON(app)
     CORS(app)

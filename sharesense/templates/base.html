@@ -3,10 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ShareSense — split expenses with flatmates, track balances, and settle up easily.">
     <title>ShareSense</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#006A6A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script defer src="/_vercel/insights/script.js"></script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
     <script>
     tailwind.config = {
         theme: {
@@ -14,7 +24,7 @@
                 colors: {
                     brand: '#006A6A', 'brand-light': '#e0f2f1', 'brand-container': '#004f4f',
                     surface: '#f6faf8', 'surface-low': '#f0f4f2', 'surface-card': '#ffffff',
-                    'on-surface': '#181d1c', 'on-surface-light': '#6e7979',
+                    'on-surface': '#181d1c', 'on-surface-light': '#5c6767',
                     danger: '#ba1a1a', 'danger-bg': 'rgba(186,26,26,0.08)',
                     'success-bg': 'rgba(0,106,106,0.06)',
                 },
@@ -304,7 +314,7 @@ const CATEGORIES=[
     {id:'food',icon:'restaurant',label:'Food'},
     {id:'transport',icon:'local_taxi',label:'Transport'},
 ];
-let _splitState={category:'groceries',selectedMembers:[],payerId:null,amount:0};
+let _splitState={selectedMembers:[],payerId:null,amount:0,category:'other'};
 
 function getCatIcon(desc, category){
     const CAT_ICONS={groceries:'shopping_basket',rent:'home_work',utilities:'bolt',fun:'theater_comedy',food:'restaurant',transport:'local_taxi'};
@@ -397,8 +407,7 @@ async function renderExpenses(fid){
     try{
         const d=await api('/api/flats/'+fid+'/expenses');
         const m=flatCache.members||[];
-        // Init split state
-        _splitState={category:'groceries',selectedMembers:m.map(x=>x.id),payerId:S.user.id,amount:0};
+        _splitState={selectedMembers:m.map(x=>x.id),payerId:S.user.id,amount:0,category:'other'};
 
         let h='';
         // ── Hero Header ──
@@ -438,20 +447,7 @@ async function renderExpenses(fid){
         h+='<input id="e-desc" class="w-full bg-transparent border-none p-0 text-lg font-body font-medium text-on-surface focus:ring-0 placeholder:text-on-surface-light/40" placeholder="Weekly grocery run..." type="text" required>';
         h+='</section>';
 
-        // ── Category Selection ──
-        h+='<section class="mb-5">';
-        h+='<h3 class="font-headline font-bold text-on-surface mb-3 text-sm">Choose Category</h3>';
-        h+='<div class="grid grid-cols-3 gap-2" id="cat-grid">';
-        CATEGORIES.forEach(c=>{
-            const active=c.id===_splitState.category;
-            const cls=active?'bg-brand text-white shadow-md':'bg-surface-card text-on-surface-light hover:bg-brand-light';
-            h+='<button onclick="pickCategory(\''+c.id+'\')" class="flex items-center gap-2 p-3 rounded-xl '+cls+' transition-all active:scale-95">';
-            h+='<span class="material-symbols-outlined text-[18px]">'+c.icon+'</span>';
-            h+='<span class="font-headline font-semibold text-xs">'+c.label+'</span></button>';
-        });
-        h+='</div></section>';
-
-        // ── Split With (member avatars) — tap to toggle, deselect yourself for "on behalf" ──
+        // ── Split With ──
         h+='<section class="mb-5">';
         h+='<div class="flex items-center justify-between mb-3">';
         h+='<h3 class="font-headline font-bold text-on-surface text-sm">Split with</h3>';
@@ -488,7 +484,6 @@ async function renderExpenses(fid){
         h+='</section>';
 
         el.innerHTML=h;
-        // Render interactive parts
         renderSplitMembers();
         updateSplitSummary();
     }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading expenses</p>'; }
@@ -496,13 +491,6 @@ async function renderExpenses(fid){
 
 function pickCategory(id){
     _splitState.category=id;
-    const grid=document.getElementById('cat-grid');
-    if(!grid) return;
-    grid.querySelectorAll('button').forEach(btn=>{
-        const cid=btn.getAttribute('onclick').match(/'(\w+)'/)[1];
-        if(cid===id){ btn.className='flex items-center gap-2 p-3 rounded-xl bg-brand text-white shadow-md transition-all active:scale-95'; }
-        else { btn.className='flex items-center gap-2 p-3 rounded-xl bg-surface-card text-on-surface-light hover:bg-brand-light transition-all active:scale-95'; }
-    });
 }
 
 async function submitExpense(fid){
@@ -553,8 +541,8 @@ async function handleReceiptUpload(input){
         // Store parsed items and show editable table
         _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other'}));
         renderReceiptTable();
-        // Auto-select category if returned
-        if(d.category) pickCategory(d.category);
+        // Set AI-inferred category
+        if(d.category && d.category!=='other') _splitState.category=d.category;
         if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — edit below then confirm</span>';
     }catch(err){
         if(status) status.textContent=err.message||'Failed to scan receipt';
@@ -569,25 +557,33 @@ function renderReceiptTable(){
 
     let total=0;
     let h='<div class="bg-surface-card rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] overflow-hidden">';
-    h+='<div class="flex items-center justify-between px-4 py-3 bg-brand-light/40 border-b border-brand/10">';
-    h+='<span class="font-headline font-bold text-xs text-brand">Scanned Items</span>';
-    h+='<button onclick="confirmReceiptItems()" class="px-3 py-1 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Confirm All</button></div>';
-    h+='<table class="w-full text-xs"><thead><tr class="text-on-surface-light text-[10px] uppercase tracking-wider">';
-    h+='<th class="text-left px-4 py-2 font-bold">Item</th><th class="text-right px-4 py-2 font-bold w-24">Price</th>';
-    h+='<th class="w-10 px-2 py-2"></th></tr></thead><tbody>';
 
+    // Header
+    h+='<div class="flex items-center justify-between px-5 py-3 bg-brand-light/50">';
+    h+='<div class="flex items-center gap-2"><span class="material-symbols-outlined text-brand text-[18px]">receipt_long</span>';
+    h+='<span class="font-headline font-bold text-xs text-brand">Scanned Items ('+_receiptItems.length+')</span></div>';
+    h+='<button onclick="confirmReceiptItems()" class="px-3 py-1.5 bg-brand text-white rounded-lg text-[10px] font-bold active:scale-95 transition-transform flex items-center gap-1">';
+    h+='<span class="material-symbols-outlined text-[14px]">check</span>Confirm</button></div>';
+
+    // Items
+    h+='<div class="divide-y divide-surface-low">';
     _receiptItems.forEach((it,i)=>{
         total+=it.price;
-        h+='<tr class="border-t border-surface-low">';
-        h+='<td class="px-4 py-2"><input class="w-full bg-transparent border-none p-0 text-xs font-medium focus:ring-0" value="'+esc(it.name)+'" onchange="updateReceiptItem('+i+',\'name\',this.value)"></td>';
-        h+='<td class="px-4 py-2 text-right"><input class="w-full bg-transparent border-none p-0 text-xs font-bold text-right focus:ring-0" type="number" step="0.01" value="'+it.price.toFixed(2)+'" onchange="updateReceiptItem('+i+',\'price\',this.value)"></td>';
-        h+='<td class="px-2 py-2 text-center"><button onclick="removeReceiptItem('+i+')" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[14px]">close</span></button></td>';
-        h+='</tr>';
+        h+='<div class="flex items-center gap-3 px-5 py-3">';
+        h+='<div class="flex-1 min-w-0"><input class="w-full bg-transparent border-none p-0 text-xs font-medium text-on-surface focus:ring-0 placeholder:text-on-surface-light/40" value="'+esc(it.name)+'" placeholder="Item name" onchange="updateReceiptItem('+i+',\'name\',this.value)"></div>';
+        h+='<div class="w-20 flex items-center gap-0.5"><span class="text-[10px] text-on-surface-light">'+CUR+'</span><input class="w-full bg-transparent border-none p-0 text-xs font-bold text-on-surface text-right focus:ring-0" type="number" step="0.01" value="'+it.price.toFixed(2)+'" onchange="updateReceiptItem('+i+',\'price\',this.value)"></div>';
+        h+='<button onclick="removeReceiptItem('+i+')" class="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors">';
+        h+='<span class="material-symbols-outlined text-danger text-[14px]">close</span></button>';
+        h+='</div>';
     });
+    h+='</div>';
 
-    h+='<tr class="border-t-2 border-brand/20"><td class="px-4 py-2 font-headline font-bold text-brand">Total</td>';
-    h+='<td class="px-4 py-2 text-right font-headline font-bold text-brand">'+CUR+total.toFixed(2)+'</td><td></td></tr>';
-    h+='</tbody></table></div>';
+    // Total
+    h+='<div class="flex items-center justify-between px-5 py-3 bg-surface-low">';
+    h+='<span class="font-headline font-bold text-xs text-on-surface">Total</span>';
+    h+='<span class="font-headline font-bold text-sm text-brand">'+CUR+total.toFixed(2)+'</span></div>';
+
+    h+='</div>';
     el.innerHTML=h;
 }
 
@@ -861,6 +857,11 @@ function route(){
 }
 window.addEventListener('hashchange',route);
 route();
+</script>
+<script>
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
