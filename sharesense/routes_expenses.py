@@ -219,3 +219,105 @@ def get_balances(flat_id):
     return jsonify({"transfers": transfers}), 200
 
 
+@bp.route("/<flat_id>/activity", methods=["GET"])
+@login_required
+def get_activity(flat_id):
+    db = get_db()
+    if not is_member(db, flat_id, request.user_id):
+        db.close()
+        return jsonify({"error": "Access denied"}), 403
+
+    # Optional filters
+    from_date = request.args.get("from")
+    to_date = request.args.get("to")
+    member_id = request.args.get("memberId")
+
+    # Build date filter clause
+    date_clause = ""
+    date_params = []
+    if from_date:
+        date_clause += " AND {ts} >= ?"
+        date_params.append(from_date)
+    if to_date:
+        date_clause += " AND {ts} <= ?"
+        date_params.append(to_date)
+
+    # Fetch expenses visible to current user, with sharers
+    exp_date = date_clause.replace("{ts}", "e.timestamp")
+    exp_params = [flat_id, request.user_id, request.user_id] + date_params
+    if member_id:
+        exp_member = " AND (e.payer_id = ? OR es2.sharer_id = ?)"
+        exp_params += [member_id, member_id]
+    else:
+        exp_member = ""
+
+    expenses = db.execute(
+        """SELECT DISTINCT e.id, e.amount, e.description, e.payer_id, e.category, e.timestamp,
+                  u.name as payer_name
+           FROM expenses e
+           JOIN users u ON e.payer_id = u.id
+           LEFT JOIN expense_shares es ON e.id = es.expense_id
+           LEFT JOIN expense_shares es2 ON e.id = es2.expense_id
+           WHERE e.flat_id = ? AND (e.payer_id = ? OR es.sharer_id = ?)"""
+        + exp_date + exp_member + " ORDER BY e.timestamp DESC",
+        exp_params,
+    ).fetchall()
+
+    # For each expense, get its sharers
+    activity = []
+    for e in expenses:
+        sharers = db.execute(
+            "SELECT es.sharer_id, es.share_amount, u.name FROM expense_shares es JOIN users u ON es.sharer_id = u.id WHERE es.expense_id = ?",
+            (e["id"],),
+        ).fetchall()
+        activity.append({
+            "type": "expense",
+            "id": e["id"],
+            "timestamp": e["timestamp"],
+            "amount": float(e["amount"]),
+            "description": e["description"],
+            "category": e["category"],
+            "payer_id": e["payer_id"],
+            "payer_name": e["payer_name"],
+            "sharers": [{"id": s["sharer_id"], "name": s["name"], "share": float(s["share_amount"])} for s in sharers],
+        })
+
+    # Fetch settlements
+    stl_date = date_clause.replace("{ts}", "s.created_at")
+    stl_params = [flat_id] + date_params
+    stl_member_clause = ""
+    if member_id:
+        stl_member_clause = " AND (s.debtor_id = ? OR s.creditor_id = ?)"
+        stl_params += [member_id, member_id]
+
+    settlements = db.execute(
+        """SELECT s.id, s.amount, s.status, s.created_at, s.confirmed_at,
+                  s.debtor_id, d.name as debtor_name,
+                  s.creditor_id, c.name as creditor_name
+           FROM settlements s
+           JOIN users d ON s.debtor_id = d.id
+           JOIN users c ON s.creditor_id = c.id
+           WHERE s.flat_id = ?""" + stl_date + stl_member_clause + " ORDER BY s.created_at DESC",
+        stl_params,
+    ).fetchall()
+
+    for s in settlements:
+        activity.append({
+            "type": "settlement",
+            "id": s["id"],
+            "timestamp": s["confirmed_at"] or s["created_at"],
+            "amount": float(s["amount"]),
+            "status": s["status"],
+            "debtor_id": s["debtor_id"],
+            "debtor_name": s["debtor_name"],
+            "creditor_id": s["creditor_id"],
+            "creditor_name": s["creditor_name"],
+        })
+
+    # Sort everything by timestamp descending
+    activity.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+
+    db.close()
+    return jsonify({"activity": activity}), 200
+
+

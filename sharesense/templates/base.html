@@ -232,9 +232,8 @@ async function flatDetailPage(fid,tab){
 async function renderLedger(fid){
     const el=document.getElementById('tab-content');
     try{
-        const [bd,ed]=await Promise.all([api('/api/flats/'+fid+'/balances'),api('/api/flats/'+fid+'/expenses')]);
+        const [bd]=await Promise.all([api('/api/flats/'+fid+'/balances')]);
         const transfers=bd.transfers||[];
-        const expenses=ed.expenses||[];
         const members=flatCache.members||[];
 
         // Compute totals for current user
@@ -282,27 +281,102 @@ async function renderLedger(fid){
             h+='</div></div>';
         }
 
-        // Recent activity
-        if(expenses.length>0){
-            h+='<div class="space-y-3 mt-4"><h3 class="font-headline text-base font-bold tracking-tight">Recent activity</h3>';
-            const recent=expenses.slice(0,5);
-            const icons=['shopping_basket','bolt','router','restaurant','local_taxi','water_drop'];
-            recent.forEach((e,i)=>{
-                const isYou=e.payer_id===S.user.id;
-                const amtCls=isYou?'text-brand':'text-danger';
-                const sign=isYou?'+':'-';
-                const share=parseFloat(e.amount)/members.length;
-                h+='<div class="flex items-center gap-3 p-3 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
-                h+='<div class="w-9 h-9 rounded-lg bg-surface-low flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icons[i%icons.length]+'</span></div>';
-                h+='<div class="flex-1"><p class="text-xs font-bold">'+esc(e.description)+'</p><p class="text-[10px] text-on-surface-light">Paid by '+esc(e.payer_name)+'</p></div>';
-                h+='<div class="text-right"><p class="font-headline text-xs font-bold '+amtCls+'">'+sign+CUR+share.toFixed(2)+'</p><p class="text-[9px] text-on-surface-light">'+new Date(e.timestamp).toLocaleDateString()+'</p></div></div>';
-            });
-            if(expenses.length>5) h+='<button onclick="switchTab(\''+fid+'\',\'expenses\')" class="w-full py-2.5 text-brand text-xs font-semibold border border-brand/10 rounded-xl hover:bg-brand/5 transition-colors">View all transactions</button>';
-            h+='</div>';
-        }
+        // Activity timeline with filters
+        h+='<div class="space-y-3 mt-4">';
+        h+='<div class="flex items-center justify-between"><h3 class="font-headline text-base font-bold tracking-tight">Activity</h3>';
+        h+='<button onclick="document.getElementById(\'activity-filters\').classList.toggle(\'hidden\')" class="text-brand text-xs font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">filter_list</span>Filter</button></div>';
+
+        // Filter controls (hidden by default)
+        h+='<div id="activity-filters" class="hidden bg-surface-card rounded-xl p-4 shadow-[0_2px_10px_rgba(24,29,28,0.03)] space-y-3">';
+        h+='<div class="grid grid-cols-2 gap-2">';
+        h+='<div><label class="text-[10px] text-on-surface-light font-bold block mb-1">From</label>';
+        h+='<input type="date" id="af-from" class="w-full px-2 py-1.5 rounded-lg bg-surface-low border-none text-xs focus:ring-2 focus:ring-brand/30"></div>';
+        h+='<div><label class="text-[10px] text-on-surface-light font-bold block mb-1">To</label>';
+        h+='<input type="date" id="af-to" class="w-full px-2 py-1.5 rounded-lg bg-surface-low border-none text-xs focus:ring-2 focus:ring-brand/30"></div>';
+        h+='</div>';
+        h+='<div><label class="text-[10px] text-on-surface-light font-bold block mb-1">Person</label>';
+        h+='<select id="af-member" class="w-full px-2 py-1.5 rounded-lg bg-surface-low border-none text-xs focus:ring-2 focus:ring-brand/30">';
+        h+='<option value="">Everyone</option>';
+        members.forEach(m=>{ h+='<option value="'+m.id+'">'+esc(m.name)+(m.id===S.user.id?' (You)':'')+'</option>'; });
+        h+='</select></div>';
+        h+='<button onclick="loadActivity(\''+fid+'\')" class="w-full py-2 bg-brand text-white rounded-lg text-xs font-semibold active:scale-[0.98] transition-transform">Apply Filters</button>';
+        h+='</div>';
+
+        // Activity list container
+        h+='<div id="activity-list"><div class="text-center py-4 text-on-surface-light text-xs">Loading activity...</div></div>';
+        h+='</div>';
 
         el.innerHTML=h;
+        // Load activity feed
+        loadActivity(fid);
     }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading data</p>'; }
+}
+
+async function loadActivity(fid){
+    const el=document.getElementById('activity-list');
+    if(!el) return;
+    el.innerHTML='<div class="text-center py-4 text-on-surface-light text-xs">Loading...</div>';
+
+    const from=document.getElementById('af-from')?.value||'';
+    const to=document.getElementById('af-to')?.value||'';
+    const memberId=document.getElementById('af-member')?.value||'';
+
+    let qs='?';
+    if(from) qs+='from='+from+'T00:00:00&';
+    if(to) qs+='to='+to+'T23:59:59&';
+    if(memberId) qs+='memberId='+memberId+'&';
+
+    try{
+        const d=await api('/api/flats/'+fid+'/activity'+qs);
+        const items=d.activity||[];
+        if(items.length===0){
+            el.innerHTML='<p class="text-center text-on-surface-light text-xs py-6">No activity found</p>';
+            return;
+        }
+
+        let h='';
+        let lastDate='';
+        items.forEach(a=>{
+            // Date separator
+            const dt=new Date(a.timestamp).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+            if(dt!==lastDate){
+                lastDate=dt;
+                h+='<div class="flex items-center gap-3 mt-3 mb-1"><div class="h-px flex-1 bg-surface-low"></div><span class="text-[10px] text-on-surface-light font-medium">'+dt+'</span><div class="h-px flex-1 bg-surface-low"></div></div>';
+            }
+
+            if(a.type==='expense'){
+                const icon=getCatIcon(a.description, a.category);
+                const isYou=a.payer_id===S.user.id;
+                // Build sharer summary
+                const sharerNames=a.sharers.map(s=>s.id===S.user.id?'You':s.name);
+                const shareInfo=a.sharers.length>0?sharerNames.join(', ')+' · '+CUR+(a.amount/a.sharers.length).toFixed(2)+' each':'';
+
+                h+='<div class="bg-surface-card rounded-xl p-3.5 shadow-[0_2px_10px_rgba(24,29,28,0.02)] space-y-2">';
+                h+='<div class="flex items-center gap-3">';
+                h+='<div class="w-9 h-9 rounded-lg bg-surface-low flex items-center justify-center text-brand"><span class="material-symbols-outlined text-[20px]">'+icon+'</span></div>';
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(a.description)+'</p>';
+                h+='<p class="text-[10px] text-on-surface-light">Paid by '+(isYou?'You':esc(a.payer_name))+'</p></div>';
+                h+='<p class="font-headline text-sm font-bold '+(isYou?'text-brand':'text-on-surface')+'">'+CUR+a.amount.toFixed(2)+'</p>';
+                h+='</div>';
+                if(shareInfo) h+='<p class="text-[10px] text-on-surface-light pl-12">Split: '+esc(shareInfo)+'</p>';
+                h+='</div>';
+
+            } else if(a.type==='settlement'){
+                const isYouDebtor=a.debtor_id===S.user.id;
+                const isYouCreditor=a.creditor_id===S.user.id;
+                const statusCls=a.status==='confirmed'?'bg-brand-light text-brand':'bg-amber-50 text-amber-600';
+
+                h+='<div class="bg-surface-card rounded-xl p-3.5 shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
+                h+='<div class="flex items-center gap-3">';
+                h+='<div class="w-9 h-9 rounded-lg bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">handshake</span></div>';
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold">'+(isYouDebtor?'You':esc(a.debtor_name))+' paid '+(isYouCreditor?'You':esc(a.creditor_name))+'</p>';
+                h+='<span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold '+statusCls+'">'+a.status+'</span></div>';
+                h+='<p class="font-headline text-sm font-bold text-brand">'+CUR+a.amount.toFixed(2)+'</p>';
+                h+='</div></div>';
+            }
+        });
+        el.innerHTML=h;
+    }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-4">Error loading activity</p>'; }
 }
 </script>
 
