@@ -43,11 +43,13 @@
 <!-- Slide-out Menu -->
 <div id="side-menu" class="fixed inset-0 z-[60] hidden">
     <div class="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onclick="toggleMenu()"></div>
-    <div class="absolute right-0 top-0 h-full w-64 bg-surface shadow-xl p-6 pt-16 space-y-4">
-        <div id="menu-user" class="mb-4"></div>
-        <div id="menu-items"></div>
-        <button onclick="logout();toggleMenu()" class="w-full py-3 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2 mt-6">
-            <span class="material-symbols-outlined text-[18px]">logout</span>Logout</button>
+    <div class="absolute right-0 top-0 h-full w-72 bg-surface shadow-xl flex flex-col">
+        <div class="p-6 pt-16" id="menu-user"></div>
+        <div class="flex-1 px-6 space-y-1" id="menu-items"></div>
+        <div class="p-6 space-y-3 border-t border-surface-low">
+            <button onclick="logout()" class="w-full py-3 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">logout</span>Logout</button>
+        </div>
     </div>
 </div>
 
@@ -77,12 +79,13 @@ function toggleMenu(){
     const m=document.getElementById('side-menu');
     m.classList.toggle('hidden');
     if(S.user){
-        document.getElementById('menu-user').innerHTML='<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand">person</span></div><div><p class="text-sm font-bold">'+esc(S.user.name||'')+'</p><p class="text-[10px] text-on-surface-light">'+esc(S.user.email||'')+'</p></div></div>';
+        document.getElementById('menu-user').innerHTML='<div class="flex items-center gap-3"><div class="w-11 h-11 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[22px]">person</span></div><div><p class="text-sm font-bold font-headline">'+esc(S.user.name||'')+'</p><p class="text-[10px] text-on-surface-light">'+esc(S.user.email||'')+'</p></div></div>';
     }
     let items='';
     if(S.groupId && groupCache.groupId===S.groupId){
-        items+='<button onclick="switchTab(\''+S.groupId+'\',\'members\');toggleMenu()" class="w-full py-2.5 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors"><span class="material-symbols-outlined text-[18px]">group</span>Members & Settings</button>';
+        items+='<button onclick="switchTab(\''+S.groupId+'\',\'members\');toggleMenu()" class="w-full py-3 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors rounded-lg hover:bg-brand-light px-3"><span class="material-symbols-outlined text-[18px]">group</span>Members & Settings</button>';
     }
+    items+='<button onclick="toggleMenu();showJoinDialog()" class="w-full py-3 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors rounded-lg hover:bg-brand-light px-3"><span class="material-symbols-outlined text-[18px]">login</span>Join Group by Code</button>';
     document.getElementById('menu-items').innerHTML=items;
 }
 
@@ -175,9 +178,7 @@ async function dashboardPage(){
         const d=await api('/api/groups');
         let h='<section class="space-y-4">';
         h+='<div class="flex items-center justify-between"><h2 class="font-headline text-xl font-bold tracking-tight">My Groups</h2>';
-        h+='<div class="flex items-center gap-3">';
-        h+='<button onclick="showJoinDialog()" class="text-on-surface-light text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">login</span>Join</button>';
-        h+='<button onclick="location.hash=\'#new-group\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div></div>';
+        h+='<button onclick="location.hash=\'#new-group\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div>';
         if(d.groups.length===0){
             h+='<div class="bg-surface-card rounded-2xl p-8 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center"><span class="material-symbols-outlined text-4xl text-on-surface-light mb-2">home_work</span><p class="text-on-surface-light text-xs">No groups yet. Create one!</p></div>';
         } else {
