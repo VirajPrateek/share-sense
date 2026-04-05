@@ -17,32 +17,47 @@ def is_member(db, group_id, user_id):
 @bp.route("/<group_id>/settlements", methods=["POST"])
 @login_required
 def create_settlement(group_id):
+    """Simplified: "I paid this person this amount". Auto-confirms for the payer."""
     data = request.get_json(silent=True) or {}
-    debtor_id = data.get("debtorId")
-    creditor_id = data.get("creditorId")
+    paid_to = data.get("paidTo")
     amount = data.get("amount")
 
-    if not debtor_id or not creditor_id or not amount:
-        return jsonify({"error": "debtorId, creditorId, and amount are required"}), 400
+    if not paid_to or not amount:
+        return jsonify({"error": "paidTo and amount are required"}), 400
     if float(amount) <= 0:
         return jsonify({"error": "Amount must be greater than 0"}), 400
-    if debtor_id == creditor_id:
-        return jsonify({"error": "Debtor and creditor must be different"}), 400
+    if paid_to == request.user_id:
+        return jsonify({"error": "Cannot settle with yourself"}), 400
 
     db = get_db()
     if not is_member(db, group_id, request.user_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
+    if not is_member(db, group_id, paid_to):
+        db.close()
+        return jsonify({"error": "That person is not in this group"}), 400
 
     settlement_id = str(uuid.uuid4())
+    # Proposer is the debtor (person who paid)
     db.execute(
         "INSERT INTO settlements (id, group_id, debtor_id, creditor_id, amount, status, proposed_by) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
-        (settlement_id, group_id, debtor_id, creditor_id, round(float(amount), 2), request.user_id),
+        (settlement_id, group_id, request.user_id, paid_to, round(float(amount), 2), request.user_id),
+    )
+    # Auto-confirm for the proposer
+    db.execute(
+        "INSERT INTO settlement_confirmations (id, settlement_id, confirmed_by) VALUES (?, ?, ?)",
+        (str(uuid.uuid4()), settlement_id, request.user_id),
     )
     db.commit()
-    settlement = dict_row(db.execute("SELECT * FROM settlements WHERE id = ?", (settlement_id,)).fetchone())
+    settlement = dict_row(db.execute(
+        """SELECT s.id, s.debtor_id, s.creditor_id, s.amount, s.status, s.created_at,
+                  d.name as debtor_name, c.name as creditor_name
+           FROM settlements s JOIN users d ON s.debtor_id = d.id JOIN users c ON s.creditor_id = c.id
+           WHERE s.id = ?""",
+        (settlement_id,),
+    ).fetchone())
     db.close()
-    return jsonify({"message": "Settlement proposed", "settlement": settlement}), 201
+    return jsonify({"message": "Settlement proposed — waiting for confirmation", "settlement": settlement}), 201
 
 
 @bp.route("/<group_id>/settlements", methods=["GET"])
@@ -59,11 +74,26 @@ def get_settlements(group_id):
            FROM settlements s
            JOIN users d ON s.debtor_id = d.id
            JOIN users c ON s.creditor_id = c.id
-           WHERE s.group_id = ? ORDER BY s.created_at DESC""",
-        (group_id,),
+           WHERE s.group_id = ? AND (s.debtor_id = ? OR s.creditor_id = ?)
+           ORDER BY s.created_at DESC""",
+        (group_id, request.user_id, request.user_id),
     ).fetchall()
+
+    # Count pending settlements that need current user's confirmation
+    pending_for_me = 0
+    for r in rows:
+        if r["status"] == "pending":
+            # Check if current user hasn't confirmed yet and is involved
+            if r["debtor_id"] == request.user_id or r["creditor_id"] == request.user_id:
+                confirmed = db.execute(
+                    "SELECT id FROM settlement_confirmations WHERE settlement_id = ? AND confirmed_by = ?",
+                    (r["id"], request.user_id),
+                ).fetchone()
+                if not confirmed:
+                    pending_for_me += 1
+
     db.close()
-    return jsonify({"settlements": [dict(r) for r in rows]}), 200
+    return jsonify({"settlements": [dict(r) for r in rows], "pendingForMe": pending_for_me}), 200
 
 
 @bp.route("/<group_id>/settlements/<settlement_id>/confirm", methods=["POST"])

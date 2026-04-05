@@ -284,7 +284,8 @@ def get_activity(group_id):
 
     # Fetch settlements
     stl_date = date_clause.replace("{ts}", "s.created_at")
-    stl_params = [group_id] + date_params
+    # Always filter settlements to current user's involvement
+    stl_params = [group_id, request.user_id, request.user_id] + date_params
     stl_member_clause = ""
     if member_id:
         stl_member_clause = " AND (s.debtor_id = ? OR s.creditor_id = ?)"
@@ -297,7 +298,7 @@ def get_activity(group_id):
            FROM settlements s
            JOIN users d ON s.debtor_id = d.id
            JOIN users c ON s.creditor_id = c.id
-           WHERE s.group_id = ?""" + stl_date + stl_member_clause + " ORDER BY s.created_at DESC",
+           WHERE s.group_id = ? AND (s.debtor_id = ? OR s.creditor_id = ?)""" + stl_date + stl_member_clause + " ORDER BY s.created_at DESC",
         stl_params,
     ).fetchall()
 

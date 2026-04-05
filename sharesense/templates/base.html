@@ -89,7 +89,7 @@ function toggleMenu(){
     document.getElementById('menu-items').innerHTML=items;
 }
 
-function showFooter(groupId, tab){
+function showFooter(groupId, tab, pendingSettlements){
     S.groupId=groupId; S.tab=tab||'ledger';
     const nav=document.getElementById('footer-nav');
     const tabs=[
@@ -102,7 +102,8 @@ function showFooter(groupId, tab){
         const active=t.id===S.tab;
         const cls=active?'text-brand bg-brand-light rounded-xl px-4 py-1.5':'text-on-surface-light px-4 py-1.5 hover:text-brand';
         const fill=active?'mso-fill':'';
-        return '<a class="flex flex-col items-center justify-center '+cls+' active:scale-90 transition-transform duration-150 cursor-pointer" onclick="switchTab(\''+groupId+'\',\''+t.id+'\')"><span class="material-symbols-outlined '+fill+'">'+t.icon+'</span><span class="font-body text-[10px] font-medium tracking-wide">'+t.label+'</span></a>';
+        const badge=(t.id==='settlements'&&pendingSettlements>0)?'<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[8px] font-bold flex items-center justify-center">'+pendingSettlements+'</span>':'';
+        return '<a class="relative flex flex-col items-center justify-center '+cls+' active:scale-90 transition-transform duration-150 cursor-pointer" onclick="switchTab(\''+groupId+'\',\''+t.id+'\')">'+badge+'<span class="material-symbols-outlined '+fill+'">'+t.icon+'</span><span class="font-body text-[10px] font-medium tracking-wide">'+t.label+'</span></a>';
     }).join('');
     nav.style.display='';
 }
@@ -163,7 +164,14 @@ function registerPage(){
 }
 async function handleRegister(e){
     e.preventDefault();
-    try{ await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:document.getElementById('r-name').value,email:document.getElementById('r-email').value,password:document.getElementById('r-pass').value})}); showMsg('Registered! Please login.','success'); location.hash='#login'; route(); }catch(err){ showMsg(err.message); }
+    try{
+        await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:document.getElementById('r-name').value,email:document.getElementById('r-email').value,password:document.getElementById('r-pass').value})});
+        // Auto-login after registration
+        const d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:document.getElementById('r-email').value,password:document.getElementById('r-pass').value})});
+        setAuth(d.token,d.user);
+        showMsg('Welcome to ShareSense!','success');
+        location.hash='#dashboard'; route();
+    }catch(err){ showMsg(err.message); }
 }
 </script>
 
@@ -171,6 +179,7 @@ async function handleRegister(e){
 // ── Dashboard ──
 async function dashboardPage(){
     showChrome(); document.getElementById('footer-nav').style.display='none';
+    S.groupId=null; groupCache={};
     const app=document.getElementById('app');
     app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
@@ -217,7 +226,7 @@ function showJoinDialog(){
     const code=prompt('Enter 6-character join code:');
     if(!code||code.trim().length!==6){ if(code!==null) showMsg('Code must be 6 characters'); return; }
     api('/api/groups/join',{method:'POST',body:JSON.stringify({code:code.trim()})})
-        .then(d=>{ showMsg('Joined group!','success'); location.hash='#group/'+d.groupId; })
+        .then(d=>{ showMsg('Joined group!','success'); groupCache={}; location.hash='#group/'+d.groupId; route(); })
         .catch(err=>showMsg(err.message));
 }
 
@@ -237,7 +246,7 @@ async function groupDetailPage(fid,tab){
             h+='<div id="tab-content"></div>';
             app.innerHTML=h;
         }
-        showFooter(fid,tab);
+        showFooter(fid,tab,groupCache.pendingSettlements||0);
         if(tab==='ledger') renderLedger(fid);
         else if(tab==='expenses') renderExpenses(fid);
         else if(tab==='settlements') renderSettlements(fid);
@@ -248,13 +257,13 @@ async function groupDetailPage(fid,tab){
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
     try{
         // Fetch group, members, and balances all in parallel
-        const [fd,md,bd]=await Promise.all([api('/api/groups/'+fid),api('/api/groups/'+fid+'/members'),api('/api/groups/'+fid+'/balances')]);
-        groupCache={group:fd.group,members:md.members,groupId:fid,balances:bd};
+        const [fd,md,bd,sd]=await Promise.all([api('/api/groups/'+fid),api('/api/groups/'+fid+'/members'),api('/api/groups/'+fid+'/balances'),api('/api/groups/'+fid+'/settlements')]);
+        groupCache={group:fd.group,members:md.members,groupId:fid,balances:bd,pendingSettlements:sd.pendingForMe||0};
         let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
         h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(fd.group.name)+'</h2></div>';
         h+='<div id="tab-content"></div>';
         app.innerHTML=h;
-        showFooter(fid,tab);
+        showFooter(fid,tab,groupCache.pendingSettlements||0);
         if(tab==='ledger') renderLedger(fid);
         else if(tab==='expenses') renderExpenses(fid);
         else if(tab==='settlements') renderSettlements(fid);
@@ -796,33 +805,7 @@ async function confirmReceiptItems(){
 function round2(n){ return Math.round(n*100)/100; }
 
 // ── Settlements Tab ──
-let _settleState={debtorId:null,creditorId:null};
-
-function renderSettleMembers(containerId, selectedId, onClickFn){
-    const el=document.getElementById(containerId);
-    if(!el) return;
-    const members=groupCache.members||[];
-    let h='';
-    members.forEach(m=>{
-        const sel=m.id===selectedId;
-        const initial=m.name.charAt(0).toUpperCase();
-        const borderCls=sel?'border-brand ring-4 ring-brand/10':'border-transparent opacity-40 hover:opacity-100';
-        h+='<div class="flex-shrink-0 cursor-pointer text-center space-y-1.5" onclick="'+onClickFn+'(\''+m.id+'\')">';
-        h+='<div class="w-14 h-14 rounded-full p-0.5 border-[3px] '+borderCls+' transition-all flex items-center justify-center bg-brand-light">';
-        h+='<span class="material-symbols-outlined text-brand text-[28px]">person</span></div>';
-        h+='<span class="text-[11px] font-semibold '+(sel?'text-brand':'text-on-surface-light')+'">'+esc(m.name)+(m.id===S.user.id?' (You)':'')+'</span></div>';
-    });
-    el.innerHTML=h;
-}
-
-function pickDebtor(uid){
-    _settleState.debtorId=uid;
-    renderSettleMembers('settle-debtors',uid,'pickDebtor');
-}
-function pickCreditor(uid){
-    _settleState.creditorId=uid;
-    renderSettleMembers('settle-creditors',uid,'pickCreditor');
-}
+let _settleState={paidTo:null};
 
 async function renderSettlements(fid){
     const el=document.getElementById('tab-content');
@@ -830,90 +813,66 @@ async function renderSettlements(fid){
         const [sd,bd]=await Promise.all([api('/api/groups/'+fid+'/settlements'),api('/api/groups/'+fid+'/balances')]);
         const m=groupCache.members||[];
         const transfers=bd.transfers||[];
-        _settleState={debtorId:null,creditorId:null};
-
-        // Compute totals for current user
-        let youAreOwed=0, youOwe=0;
-        transfers.forEach(t=>{
-            if(t.to_id===S.user.id) youAreOwed+=t.amount;
-            if(t.from_id===S.user.id) youOwe+=t.amount;
-        });
+        _settleState={paidTo:null};
 
         let h='';
 
-        // ── Hero Balance Cards ──
-        h+='<section class="grid grid-cols-2 gap-3 mb-6">';
-        // Owed to you
-        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] border-l-4 border-brand relative overflow-hidden">';
-        h+='<div class="absolute top-1 right-1 opacity-[0.04]"><span class="material-symbols-outlined text-[64px]">trending_up</span></div>';
-        h+='<p class="text-[10px] font-headline font-bold uppercase tracking-[0.12em] text-on-surface-light mb-1.5">Owed to You</p>';
-        h+='<p class="text-2xl font-extrabold font-headline text-brand">'+CUR+youAreOwed.toFixed(2)+'</p>';
-        h+='</div>';
-        // You owe
-        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] border-l-4 border-[#3f6374] relative overflow-hidden">';
-        h+='<div class="absolute top-1 right-1 opacity-[0.04]"><span class="material-symbols-outlined text-[64px]">trending_down</span></div>';
-        h+='<p class="text-[10px] font-headline font-bold uppercase tracking-[0.12em] text-on-surface-light mb-1.5">You Owe</p>';
-        h+='<p class="text-2xl font-extrabold font-headline text-danger">'+CUR+youOwe.toFixed(2)+'</p>';
-        h+='</div>';
-        h+='</section>';
+        // ── Pending confirmations for me (I'm the creditor and haven't confirmed) ──
+        const pendingForMe=sd.settlements.filter(s=>s.status==='pending'&&s.creditor_id===S.user.id);
+        if(pendingForMe.length>0){
+            h+='<section class="mb-6">';
+            h+='<h3 class="font-headline text-sm font-bold mb-3 flex items-center gap-2">Needs Your Confirmation <span class="w-5 h-5 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center">'+pendingForMe.length+'</span></h3>';
+            pendingForMe.forEach(s=>{
+                const isYouDebtor=s.debtor_id===S.user.id;
+                h+='<div class="flex items-center gap-3 p-4 bg-amber-50 rounded-xl mb-2">';
+                h+='<div class="w-9 h-9 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">handshake</span></div>';
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold">'+esc(s.debtor_name)+' paid '+esc(s.creditor_name)+'</p>';
+                h+='<p class="text-[10px] text-on-surface-light">'+CUR+parseFloat(s.amount).toFixed(2)+' · '+new Date(s.created_at).toLocaleDateString()+'</p></div>';
+                h+='<button onclick="confirmSettlement(\''+fid+'\',\''+s.id+'\')" class="px-3 py-2 bg-brand text-white rounded-lg text-[10px] font-bold active:scale-95 transition-transform">Confirm</button>';
+                h+='</div>';
+            });
+            h+='</section>';
+        }
 
-        // ── Record Settlement Section ──
+        // ── Record Settlement — simplified ──
         h+='<section class="mb-6">';
-        h+='<h2 class="text-xl font-headline font-bold text-on-surface mb-1">Record Settlement</h2>';
-        h+='<p class="text-on-surface-light text-xs mb-5">Settle up with your members.</p>';
+        h+='<h2 class="text-lg font-headline font-bold text-on-surface mb-1">I paid someone</h2>';
+        h+='<p class="text-on-surface-light text-xs mb-4">Select who you paid and enter the amount</p>';
 
-        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-6">';
+        h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-5">';
 
-        // Payer → Receiver with avatars
-        h+='<div class="space-y-5">';
-
-        // Who paid
+        // Who did you pay?
         h+='<div class="space-y-2.5">';
-        h+='<label class="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-light">Who paid?</label>';
-        h+='<div class="flex gap-3 overflow-x-auto no-scrollbar" id="settle-debtors"></div>';
+        h+='<label class="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-light">Who did you pay?</label>';
+        h+='<div class="flex gap-3 overflow-x-auto no-scrollbar" id="settle-to"></div>';
         h+='</div>';
 
-        // Flow arrow
-        h+='<div class="flex justify-center">';
-        h+='<div class="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center text-brand">';
-        h+='<span class="material-symbols-outlined text-xl">south</span></div></div>';
-
-        // Paid to
-        h+='<div class="space-y-2.5">';
-        h+='<label class="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-light">Paid to?</label>';
-        h+='<div class="flex gap-3 overflow-x-auto no-scrollbar" id="settle-creditors"></div>';
-        h+='</div>';
-
-        h+='</div>';
-
-        // Amount + Confirm
-        h+='<div class="bg-surface-low p-4 rounded-xl space-y-4">';
+        // Amount + Submit
+        h+='<div class="space-y-4">';
         h+='<div class="flex items-baseline gap-1 justify-center">';
         h+='<span class="text-2xl font-headline font-medium text-brand">'+CUR+'</span>';
         h+='<input id="s-amount" class="w-full max-w-[160px] bg-transparent border-none text-4xl font-headline font-extrabold text-on-surface focus:ring-0 placeholder:text-on-surface-light/20 p-0 text-center" placeholder="0.00" type="number" step="0.01" min="0.01">';
         h+='</div>';
         h+='<button onclick="submitSettlement(\''+fid+'\')" class="w-full py-3.5 rounded-xl bg-gradient-to-br from-[#005050] to-brand text-white font-headline font-bold text-sm shadow-lg shadow-brand/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">';
-        h+='<span>Confirm Settlement</span><span class="material-symbols-outlined text-[20px]">handshake</span></button>';
+        h+='<span>Record Payment</span><span class="material-symbols-outlined text-[20px]">handshake</span></button>';
         h+='</div>';
 
         h+='</div>';
         h+='</section>';
 
-        // ── Suggested Settlements (from balances) ──
+        // ── Suggested Settlements ──
         if(transfers.length>0){
             h+='<section class="mb-6">';
-            h+='<h3 class="font-headline text-sm font-bold mb-3">Suggested Settlements</h3>';
+            h+='<h3 class="font-headline text-sm font-bold mb-3">Suggested</h3>';
             h+='<div class="space-y-2">';
             transfers.forEach(t=>{
                 const isYouDebtor=t.from_id===S.user.id;
-                const isYouCreditor=t.to_id===S.user.id;
-                h+='<div class="flex items-center gap-3 p-3.5 bg-brand-light/30 rounded-xl border border-brand/10">';
+                if(!isYouDebtor) return; // only show suggestions where you owe
+                h+='<div class="flex items-center gap-3 p-3.5 bg-brand-light/30 rounded-xl">';
                 h+='<div class="w-9 h-9 rounded-full bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand text-[20px]">swap_horiz</span></div>';
-                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold truncate">'+esc(t.from_name)+' → '+esc(t.to_name)+'</p>';
-                h+='<p class="text-[10px] text-on-surface-light">'+CUR+parseFloat(t.amount).toFixed(2)+' to settle</p></div>';
-                if(isYouDebtor||isYouCreditor){
-                    h+='<button onclick="quickSettle(\''+fid+'\',\''+t.from_id+'\',\''+t.to_id+'\','+t.amount+')" class="px-3 py-1.5 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Settle</button>';
-                }
+                h+='<div class="flex-1 min-w-0"><p class="text-xs font-bold">Pay '+esc(t.to_name)+'</p>';
+                h+='<p class="text-[10px] text-on-surface-light">'+CUR+parseFloat(t.amount).toFixed(2)+' to settle up</p></div>';
+                h+='<button onclick="quickSettle(\''+fid+'\',\''+t.to_id+'\','+t.amount+')" class="px-3 py-1.5 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Pay</button>';
                 h+='</div>';
             });
             h+='</div></section>';
@@ -921,7 +880,7 @@ async function renderSettlements(fid){
 
         // ── Settlement History ──
         h+='<section class="space-y-3">';
-        h+='<h3 class="font-headline text-sm font-bold">Settlement History</h3>';
+        h+='<h3 class="font-headline text-sm font-bold">History</h3>';
         if(sd.settlements.length===0){
             h+='<p class="text-center text-on-surface-light text-xs py-6">No settlements yet</p>';
         } else {
@@ -929,10 +888,8 @@ async function renderSettlements(fid){
                 const isConfirmed=s.status==='confirmed';
                 const badgeCls=isConfirmed?'bg-brand-light text-brand':'bg-amber-50 text-amber-600';
                 const badgeText=isConfirmed?'Settled':'Pending';
-                const initial=s.debtor_name.charAt(0).toUpperCase();
 
                 h+='<div class="bg-surface-card p-4 rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)] flex items-center gap-3">';
-                // Avatar with check
                 h+='<div class="relative flex-shrink-0">';
                 h+='<div class="w-11 h-11 rounded-full bg-brand-light flex items-center justify-center">';
                 h+='<span class="material-symbols-outlined text-brand text-[22px]">person</span></div>';
@@ -941,53 +898,65 @@ async function renderSettlements(fid){
                     h+='<span class="material-symbols-outlined text-[12px] text-brand mso-fill">check</span></div>';
                 }
                 h+='</div>';
-                // Info
                 h+='<div class="flex-1 min-w-0">';
-                h+='<p class="text-xs font-bold truncate">'+esc(s.debtor_name)+' → '+esc(s.creditor_name)+'</p>';
+                h+='<p class="text-xs font-bold truncate">'+esc(s.debtor_name)+' paid '+esc(s.creditor_name)+'</p>';
                 h+='<p class="text-[10px] text-on-surface-light">'+new Date(s.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</p>';
                 h+='</div>';
-                // Right side
                 h+='<div class="text-right flex-shrink-0 space-y-1">';
                 h+='<p class="font-headline font-bold text-sm">'+CUR+parseFloat(s.amount).toFixed(2)+'</p>';
                 h+='<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider '+badgeCls+'">'+badgeText+'</span>';
-                if(!isConfirmed){
-                    h+='<br><button onclick="confirmSettlement(\''+fid+'\',\''+s.id+'\')" class="mt-1 px-2.5 py-1 bg-brand text-white rounded-lg text-[10px] font-semibold active:scale-95 transition-transform">Confirm</button>';
-                }
                 h+='</div></div>';
             });
         }
         h+='</section>';
 
         el.innerHTML=h;
-        // Render interactive member selectors
-        renderSettleMembers('settle-debtors',null,'pickDebtor');
-        renderSettleMembers('settle-creditors',null,'pickCreditor');
+        // Render member selector (exclude self)
+        renderSettleToMembers(fid);
     }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-8">Error loading settlements</p>'; }
 }
 
+function renderSettleToMembers(fid){
+    const el=document.getElementById('settle-to');
+    if(!el) return;
+    const members=groupCache.members||[];
+    let h='';
+    members.forEach(m=>{
+        if(m.id===S.user.id) return; // can't pay yourself
+        const sel=m.id===_settleState.paidTo;
+        const borderCls=sel?'border-brand ring-4 ring-brand/10':'border-transparent opacity-40 hover:opacity-100';
+        h+='<div class="flex-shrink-0 cursor-pointer text-center space-y-1.5" onclick="pickSettleTo(\''+m.id+'\')">';
+        h+='<div class="w-14 h-14 rounded-full p-0.5 border-[3px] '+borderCls+' transition-all flex items-center justify-center bg-brand-light">';
+        h+='<span class="material-symbols-outlined text-brand text-[28px]">person</span></div>';
+        h+='<span class="text-[11px] font-semibold '+(sel?'text-brand':'text-on-surface-light')+'">'+esc(m.name)+'</span></div>';
+    });
+    el.innerHTML=h;
+}
+
+function pickSettleTo(uid){
+    _settleState.paidTo=uid;
+    renderSettleToMembers();
+}
+
 async function submitSettlement(fid){
-    const a=_settleState.debtorId, b=_settleState.creditorId;
+    const paidTo=_settleState.paidTo;
     const amt=parseFloat(document.getElementById('s-amount')?.value);
-    if(!a){showMsg('Select who paid');return;}
-    if(!b){showMsg('Select who was paid');return;}
-    if(a===b){showMsg('Must be different people');return;}
+    if(!paidTo){showMsg('Select who you paid');return;}
     if(!amt||amt<=0){showMsg('Enter a valid amount');return;}
     try{
-        await api('/api/groups/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:a,creditorId:b,amount:amt})});
-        showMsg('Settlement proposed!','success');
-        groupDetailPage(fid,'settlements');
+        await api('/api/groups/'+fid+'/settlements',{method:'POST',body:JSON.stringify({paidTo:paidTo,amount:amt})});
+        showMsg('Payment recorded — waiting for confirmation','success');
+        groupCache={}; groupDetailPage(fid,'settlements');
     }catch(err){ showMsg(err.message); }
 }
 
-async function quickSettle(fid,fromId,toId,amount){
+async function quickSettle(fid,toId,amount){
     try{
-        await api('/api/groups/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:fromId,creditorId:toId,amount:amount})});
-        showMsg('Settlement proposed!','success');
-        groupDetailPage(fid,'settlements');
+        await api('/api/groups/'+fid+'/settlements',{method:'POST',body:JSON.stringify({paidTo:toId,amount:amount})});
+        showMsg('Payment recorded!','success');
+        groupCache={}; groupDetailPage(fid,'settlements');
     }catch(err){ showMsg(err.message); }
 }
-
-async function handleSettle(e,fid){ e.preventDefault(); submitSettlement(fid); }
 
 async function confirmSettlement(fid,sid){
     try{ await api('/api/groups/'+fid+'/settlements/'+sid+'/confirm',{method:'POST'}); showMsg('Confirmed!','success'); groupDetailPage(fid,'settlements'); }catch(err){ showMsg(err.message); }
