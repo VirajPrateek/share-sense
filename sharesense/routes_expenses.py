@@ -6,16 +6,16 @@ from flask import Blueprint, request, jsonify
 from auth import login_required, dict_row
 from database import get_db
 
-bp = Blueprint("expenses", __name__, url_prefix="/api/flats")
+bp = Blueprint("expenses", __name__, url_prefix="/api/groups")
 
 
-def is_member(db, flat_id, user_id):
-    return db.execute("SELECT id FROM flat_members WHERE flat_id = ? AND user_id = ?", (flat_id, user_id)).fetchone() is not None
+def is_member(db, group_id, user_id):
+    return db.execute("SELECT id FROM group_members WHERE group_id = ? AND user_id = ?", (group_id, user_id)).fetchone() is not None
 
 
-@bp.route("/<flat_id>/expenses", methods=["POST"])
+@bp.route("/<group_id>/expenses", methods=["POST"])
 @login_required
-def add_expense(flat_id):
+def add_expense(group_id):
     data = request.get_json(silent=True) or {}
     amount = data.get("amount")
     description = (data.get("description") or "").strip()
@@ -34,7 +34,7 @@ def add_expense(flat_id):
     amount = round(float(amount), 2)
     db = get_db()
 
-    if not is_member(db, flat_id, request.user_id):
+    if not is_member(db, group_id, request.user_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
@@ -44,25 +44,25 @@ def add_expense(flat_id):
     # Create expense
     expense_id = str(uuid.uuid4())
     db.execute(
-        "INSERT INTO expenses (id, amount, description, payer_id, flat_id, expense_type, category, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (expense_id, amount, description, payer_id, flat_id, expense_type, category, timestamp),
+        "INSERT INTO expenses (id, amount, description, payer_id, group_id, expense_type, category, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (expense_id, amount, description, payer_id, group_id, expense_type, category, timestamp),
     )
 
     # If shared, split among specified members (or all members if not specified)
     if expense_type == "shared":
         if sharer_ids and len(sharer_ids) > 0:
-            # Validate all sharer IDs are flat members
-            members = db.execute("SELECT user_id FROM flat_members WHERE flat_id = ?", (flat_id,)).fetchall()
+            # Validate all sharer IDs are group members
+            members = db.execute("SELECT user_id FROM group_members WHERE group_id = ?", (group_id,)).fetchall()
             member_ids = {m["user_id"] for m in members}
             for sid in sharer_ids:
                 if sid not in member_ids:
                     db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
                     db.commit()
                     db.close()
-                    return jsonify({"error": "One or more selected members are not in this flat"}), 400
+                    return jsonify({"error": "One or more selected members are not in this group"}), 400
             split_ids = sharer_ids
         else:
-            members = db.execute("SELECT user_id FROM flat_members WHERE flat_id = ?", (flat_id,)).fetchall()
+            members = db.execute("SELECT user_id FROM group_members WHERE group_id = ?", (group_id,)).fetchall()
             split_ids = [m["user_id"] for m in members]
 
         if len(split_ids) == 0:
@@ -80,18 +80,18 @@ def add_expense(flat_id):
 
     db.commit()
     expense = dict_row(db.execute(
-        "SELECT id, amount, description, payer_id, flat_id, expense_type, category, timestamp, created_at FROM expenses WHERE id = ?",
+        "SELECT id, amount, description, payer_id, group_id, expense_type, category, timestamp, created_at FROM expenses WHERE id = ?",
         (expense_id,),
     ).fetchone())
     db.close()
     return jsonify({"message": "Expense added", "expense": expense}), 201
 
 
-@bp.route("/<flat_id>/expenses", methods=["GET"])
+@bp.route("/<group_id>/expenses", methods=["GET"])
 @login_required
-def get_expenses(flat_id):
+def get_expenses(group_id):
     db = get_db()
-    if not is_member(db, flat_id, request.user_id):
+    if not is_member(db, group_id, request.user_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
@@ -100,23 +100,23 @@ def get_expenses(flat_id):
                   u.name as payer_name
            FROM expenses e JOIN users u ON e.payer_id = u.id
            LEFT JOIN expense_shares es ON e.id = es.expense_id
-           WHERE e.flat_id = ? AND (e.payer_id = ? OR es.sharer_id = ?)
+           WHERE e.group_id = ? AND (e.payer_id = ? OR es.sharer_id = ?)
            ORDER BY e.timestamp DESC""",
-        (flat_id, request.user_id, request.user_id),
+        (group_id, request.user_id, request.user_id),
     ).fetchall()
     db.close()
     return jsonify({"expenses": [dict(r) for r in rows]}), 200
 
 
-@bp.route("/<flat_id>/expenses/<expense_id>", methods=["DELETE"])
+@bp.route("/<group_id>/expenses/<expense_id>", methods=["DELETE"])
 @login_required
-def delete_expense(flat_id, expense_id):
+def delete_expense(group_id, expense_id):
     db = get_db()
-    if not is_member(db, flat_id, request.user_id):
+    if not is_member(db, group_id, request.user_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
-    expense = db.execute("SELECT id, payer_id FROM expenses WHERE id = ? AND flat_id = ?", (expense_id, flat_id)).fetchone()
+    expense = db.execute("SELECT id, payer_id FROM expenses WHERE id = ? AND group_id = ?", (expense_id, group_id)).fetchone()
     if not expense:
         db.close()
         return jsonify({"error": "Expense not found"}), 404
@@ -133,17 +133,17 @@ def delete_expense(flat_id, expense_id):
 
 
 
-@bp.route("/<flat_id>/balances", methods=["GET"])
+@bp.route("/<group_id>/balances", methods=["GET"])
 @login_required
-def get_balances(flat_id):
+def get_balances(group_id):
     db = get_db()
-    if not is_member(db, flat_id, request.user_id):
+    if not is_member(db, group_id, request.user_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
     members = db.execute(
-        "SELECT u.id, u.name FROM users u JOIN flat_members fm ON u.id = fm.user_id WHERE fm.flat_id = ?",
-        (flat_id,),
+        "SELECT u.id, u.name FROM users u JOIN group_members fm ON u.id = fm.user_id WHERE fm.group_id = ?",
+        (group_id,),
     ).fetchall()
 
     # Calculate net balance per person: paid - owed
@@ -154,8 +154,8 @@ def get_balances(flat_id):
         names[m["id"]] = m["name"]
 
     paid = db.execute(
-        "SELECT payer_id, SUM(amount) as total FROM expenses WHERE flat_id = ? AND expense_type = 'shared' GROUP BY payer_id",
-        (flat_id,),
+        "SELECT payer_id, SUM(amount) as total FROM expenses WHERE group_id = ? AND expense_type = 'shared' GROUP BY payer_id",
+        (group_id,),
     ).fetchall()
     for p in paid:
         if p["payer_id"] in balances:
@@ -164,9 +164,9 @@ def get_balances(flat_id):
     owed = db.execute(
         """SELECT es.sharer_id, SUM(es.share_amount) as total
            FROM expense_shares es JOIN expenses e ON es.expense_id = e.id
-           WHERE e.flat_id = ? AND e.expense_type = 'shared'
+           WHERE e.group_id = ? AND e.expense_type = 'shared'
            GROUP BY es.sharer_id""",
-        (flat_id,),
+        (group_id,),
     ).fetchall()
     for o in owed:
         if o["sharer_id"] in balances:
@@ -174,8 +174,8 @@ def get_balances(flat_id):
 
     # Factor in confirmed settlements
     settlements = db.execute(
-        "SELECT debtor_id, creditor_id, amount FROM settlements WHERE flat_id = ? AND status = 'confirmed'",
-        (flat_id,),
+        "SELECT debtor_id, creditor_id, amount FROM settlements WHERE group_id = ? AND status = 'confirmed'",
+        (group_id,),
     ).fetchall()
     for s in settlements:
         if s["debtor_id"] in balances:
@@ -219,11 +219,11 @@ def get_balances(flat_id):
     return jsonify({"transfers": transfers}), 200
 
 
-@bp.route("/<flat_id>/activity", methods=["GET"])
+@bp.route("/<group_id>/activity", methods=["GET"])
 @login_required
-def get_activity(flat_id):
+def get_activity(group_id):
     db = get_db()
-    if not is_member(db, flat_id, request.user_id):
+    if not is_member(db, group_id, request.user_id):
         db.close()
         return jsonify({"error": "Access denied"}), 403
 
@@ -244,7 +244,7 @@ def get_activity(flat_id):
 
     # Fetch expenses visible to current user, with sharers
     exp_date = date_clause.replace("{ts}", "e.timestamp")
-    exp_params = [flat_id, request.user_id, request.user_id] + date_params
+    exp_params = [group_id, request.user_id, request.user_id] + date_params
     if member_id:
         exp_member = " AND (e.payer_id = ? OR es2.sharer_id = ?)"
         exp_params += [member_id, member_id]
@@ -258,7 +258,7 @@ def get_activity(flat_id):
            JOIN users u ON e.payer_id = u.id
            LEFT JOIN expense_shares es ON e.id = es.expense_id
            LEFT JOIN expense_shares es2 ON e.id = es2.expense_id
-           WHERE e.flat_id = ? AND (e.payer_id = ? OR es.sharer_id = ?)"""
+           WHERE e.group_id = ? AND (e.payer_id = ? OR es.sharer_id = ?)"""
         + exp_date + exp_member + " ORDER BY e.timestamp DESC",
         exp_params,
     ).fetchall()
@@ -284,7 +284,7 @@ def get_activity(flat_id):
 
     # Fetch settlements
     stl_date = date_clause.replace("{ts}", "s.created_at")
-    stl_params = [flat_id] + date_params
+    stl_params = [group_id] + date_params
     stl_member_clause = ""
     if member_id:
         stl_member_clause = " AND (s.debtor_id = ? OR s.creditor_id = ?)"
@@ -297,7 +297,7 @@ def get_activity(flat_id):
            FROM settlements s
            JOIN users d ON s.debtor_id = d.id
            JOIN users c ON s.creditor_id = c.id
-           WHERE s.flat_id = ?""" + stl_date + stl_member_clause + " ORDER BY s.created_at DESC",
+           WHERE s.group_id = ?""" + stl_date + stl_member_clause + " ORDER BY s.created_at DESC",
         stl_params,
     ).fetchall()
 

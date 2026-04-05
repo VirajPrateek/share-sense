@@ -2,45 +2,72 @@
 
 ## 1. Project Overview
 **Name:** ShareSense
-**Purpose:** A lightweight, simple web application for roommates and groups to track shared expenses and settle debts.
-**Platform:** Web Application (Mobile Responsible)
+**Purpose:** A lightweight web application for groups (flatmates, friends, travelers) to track shared expenses, scan receipts, and settle debts.
+**Platform:** Web Application (Mobile-first, PWA installable)
 
 ## 2. Core Features
 
 ### 2.1 User Authentication
-*   **Google Sign-In:** Users can sign in using their existing Google accounts for ease of access.
-*   **Profile:** Basic profile with name and email (pulled from Google).
+- Email/password registration and login
+- JWT-based session management
+- Future: Google OAuth for one-tap sign-in
 
 ### 2.2 Group Management
-*   **Create Group:** Users can create a new group (e.g., "Flat 101", "Trip to Vegas").
-*   **Manage Members:**
-    *   Add members via email.
-    *   Members can join or leave groups.
-    *   Deactivate members (soft delete, keeping history).
+- Create groups for any context (flats, trips, dinners, etc.)
+- Add members via email
+- Remove members
+- Groups are generic — the name provides context ("Flat 502", "Goa Trip", "Friday Dinner")
 
 ### 2.3 Expense Tracking
-*   **Add Expense:**
-    *   Description (What was bought?)
-    *   Amount (How much?)
-    *   Payer (Who paid?)
-    *   Date (When?)
-*   **Splitting Logic (MVP):**
-    *   Split equally among all active members of the group.
-    *   *Future:* Unequal splits, shares, specific people.
+- Add expenses with description and amount
+- Payer is always the logged-in user (prevents duplicate entries)
+- Flexible splitting: select which members share each expense
+- Deselect yourself to log expenses paid on behalf of others
+- Personal expense tracking (select only yourself — invisible to others)
+- AI-powered category inference (no manual category selection)
 
-### 2.4 Balances & Settlement
-*   **Dashboard:** View current balances (e.g., "You owe Alice $50", "Bob owes you $20").
-*   **Date Range Filter:** Filter expenses and balances by date.
-*   **Settle Up:**
-    *   Record a payment (Person A paid Person B).
-    *   Confirmation mechanism (optional for MVP, but good practice).
-    *   Resets the debt cycle for those specific transactions.
+### 2.4 Receipt Scanning (AI)
+- Upload receipt photo or screenshot (BigBasket, Zepto, Blinkit, etc.)
+- Gemini AI extracts line items with prices and categories
+- Client-side image resizing (1024px max) before upload
+- Editable item table with per-item split assignment
+- Items grouped by split pattern → submitted as separate expenses
+- Full-screen loading overlay during AI processing
 
-## 3. User Experience (UX)
-*   **Design:** Modern, clean, and "premium" feel. Vibrant colors, smooth transitions.
-*   **Simplicity:** Minimal clicks to add an expense.
-*   **Responsiveness:** Must work perfectly on mobile browsers since users will likely add expenses on the go.
+### 2.5 Balances & Settlement
+- Net balance dashboard (who owes whom, how much)
+- Debt simplification algorithm (minimize number of transfers)
+- Settlement proposal + confirmation flow
+- Suggested settlements based on current balances
 
-## 4. Constraints & Assumptions
-*   **Free Hosting:** The project aims to run on zero-cost infrastructure.
-*   **Connectivity:** Requires internet access.
+### 2.6 Activity Timeline
+- Unified chronological feed of expenses and settlements
+- Date separators for readability
+- Filterable by date range and member
+- Shows full split details (who paid, who shares, amount per person)
+
+### 2.7 Privacy
+- Users only see expenses they're involved in (as payer or sharer)
+- Personal expenses are invisible to other group members
+- Only the payer can delete their own expenses
+
+## 3. User Experience
+- Mobile-first responsive design
+- PWA: installable on home screen, offline viewing of cached data
+- Minimal friction: no category picker (AI handles it), no payer dropdown (always you)
+- Receipt scan → edit items → assign splits → confirm — one flow
+
+## 4. Performance
+- Pre-built Tailwind CSS (26KB vs 419KB CDN runtime)
+- Font preconnect hints
+- Tab switching uses cached data (no redundant API calls)
+- Service worker caches app shell + API responses
+- Client-side image compression before AI upload
+- Lighthouse: 100/100/100 (Accessibility, Best Practices, SEO)
+
+## 5. Infrastructure
+- Vercel (serverless hosting, auto-deploy from Git)
+- Supabase PostgreSQL (free tier)
+- Gemini AI free tier (receipt parsing)
+- Vercel Analytics + Speed Insights
+- Zero-cost at small scale

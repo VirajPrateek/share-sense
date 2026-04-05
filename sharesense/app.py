@@ -8,7 +8,7 @@ from datetime import datetime, date, timezone
 import config
 from database import init_db, get_db
 import routes_auth
-import routes_flats
+import routes_groups
 import routes_expenses
 import routes_settlements
 import routes_receipt
@@ -36,7 +36,7 @@ def create_app():
     CORS(app)
 
     app.register_blueprint(routes_auth.bp)
-    app.register_blueprint(routes_flats.bp)
+    app.register_blueprint(routes_groups.bp)
     app.register_blueprint(routes_expenses.bp)
     app.register_blueprint(routes_settlements.bp)
     app.register_blueprint(routes_receipt.bp)

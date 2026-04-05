@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ShareSense — split expenses with flatmates, track balances, and settle up easily.">
+    <meta name="description" content="ShareSense — split expenses with members, track balances, and settle up easily.">
     <title>ShareSense</title>
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#006A6A">
@@ -50,8 +50,8 @@
 
 <script>
 const API = '', CUR = '₹';
-const S = { token: localStorage.getItem('ss_token'), user: JSON.parse(localStorage.getItem('ss_user')||'null'), flatId: null, tab: 'ledger' };
-let flatCache = {};
+const S = { token: localStorage.getItem('ss_token'), user: JSON.parse(localStorage.getItem('ss_user')||'null'), groupId: null, tab: 'ledger' };
+let groupCache = {};
 
 function setAuth(t,u){ S.token=t; S.user=u; localStorage.setItem('ss_token',t); localStorage.setItem('ss_user',JSON.stringify(u)); }
 function clearAuth(){ S.token=null; S.user=null; localStorage.removeItem('ss_token'); localStorage.removeItem('ss_user'); }
@@ -70,8 +70,8 @@ function showMsg(text, type='error'){
     d.textContent=text; document.body.appendChild(d); setTimeout(()=>d.remove(),3000);
 }
 
-function showFooter(flatId, tab){
-    S.flatId=flatId; S.tab=tab||'ledger';
+function showFooter(groupId, tab){
+    S.groupId=groupId; S.tab=tab||'ledger';
     const nav=document.getElementById('footer-nav');
     const tabs=[
         {id:'ledger',icon:'account_balance_wallet',label:'ledger'},
@@ -84,11 +84,11 @@ function showFooter(flatId, tab){
         const active=t.id===S.tab;
         const cls=active?'text-brand bg-brand-light rounded-xl px-4 py-1.5':'text-on-surface-light px-4 py-1.5 hover:text-brand';
         const fill=active?'mso-fill':'';
-        return '<a class="flex flex-col items-center justify-center '+cls+' active:scale-90 transition-transform duration-150 cursor-pointer" onclick="switchTab(\''+flatId+'\',\''+t.id+'\')"><span class="material-symbols-outlined '+fill+'">'+t.icon+'</span><span class="font-body text-[10px] font-medium tracking-wide">'+t.label+'</span></a>';
+        return '<a class="flex flex-col items-center justify-center '+cls+' active:scale-90 transition-transform duration-150 cursor-pointer" onclick="switchTab(\''+groupId+'\',\''+t.id+'\')"><span class="material-symbols-outlined '+fill+'">'+t.icon+'</span><span class="font-body text-[10px] font-medium tracking-wide">'+t.label+'</span></a>';
     }).join('');
     nav.style.display='';
 }
-function switchTab(fid,tab){ flatDetailPage(fid,tab); }
+function switchTab(fid,tab){ groupDetailPage(fid,tab); }
 
 // ── Auth Pages ──
 function loginPage(){
@@ -148,15 +148,15 @@ async function dashboardPage(){
     app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
     try{
-        const d=await api('/api/flats');
+        const d=await api('/api/groups');
         let h='<section class="space-y-4">';
-        h+='<div class="flex items-center justify-between"><h2 class="font-headline text-xl font-bold tracking-tight">My Flats</h2>';
-        h+='<button onclick="location.hash=\'#new-flat\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div>';
-        if(d.flats.length===0){
-            h+='<div class="bg-surface-card rounded-2xl p-8 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center"><span class="material-symbols-outlined text-4xl text-on-surface-light mb-2">home_work</span><p class="text-on-surface-light text-xs">No flats yet. Create one!</p></div>';
+        h+='<div class="flex items-center justify-between"><h2 class="font-headline text-xl font-bold tracking-tight">My Groups</h2>';
+        h+='<button onclick="location.hash=\'#new-group\'" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add_circle</span>New</button></div>';
+        if(d.groups.length===0){
+            h+='<div class="bg-surface-card rounded-2xl p-8 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center"><span class="material-symbols-outlined text-4xl text-on-surface-light mb-2">home_work</span><p class="text-on-surface-light text-xs">No groups yet. Create one!</p></div>';
         } else {
-            d.flats.forEach(f=>{
-                h+='<a href="#flat/'+f.id+'" class="block bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] active:scale-[0.98] transition-transform">';
+            d.groups.forEach(f=>{
+                h+='<a href="#group/'+f.id+'" class="block bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] active:scale-[0.98] transition-transform">';
                 h+='<div class="flex items-center gap-4"><div class="w-11 h-11 rounded-xl bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand">apartment</span></div>';
                 h+='<div class="flex-1"><p class="font-headline text-sm font-bold">'+esc(f.name)+'</p><p class="text-on-surface-light text-[11px]">Joined '+new Date(f.created_at).toLocaleDateString()+'</p></div>';
                 h+='<span class="material-symbols-outlined text-on-surface-light text-[20px]">chevron_right</span></div></a>';
@@ -167,38 +167,38 @@ async function dashboardPage(){
     }catch(err){ showMsg(err.message); }
 }
 
-function newFlatPage(){
+function newGroupPage(){
     showChrome(); document.getElementById('footer-nav').style.display='none';
     const app=document.getElementById('app');
     app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
     app.innerHTML=`
         <div class="bg-surface-card rounded-2xl p-6 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-4">
-            <h2 class="font-headline text-lg font-bold">Create New Flat</h2>
-            <form onsubmit="handleCreateFlat(event)" class="space-y-3">
-                <input type="text" id="f-name" placeholder="Flat name (e.g. Flat 101)" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
+            <h2 class="font-headline text-lg font-bold">Create New Group</h2>
+            <form onsubmit="handleCreateGroup(event)" class="space-y-3">
+                <input type="text" id="g-name" placeholder="Group name (e.g. Flat 502, Goa Trip)" required class="w-full px-4 py-3 rounded-xl bg-surface-low border-none text-sm focus:ring-2 focus:ring-brand/30">
                 <button class="w-full py-3 bg-brand text-white rounded-xl text-sm font-semibold active:scale-[0.98] transition-transform" type="submit">Create</button>
             </form>
             <a href="#dashboard" class="text-brand text-xs font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">arrow_back</span>Back</a>
         </div>`;
 }
-async function handleCreateFlat(e){
+async function handleCreateGroup(e){
     e.preventDefault();
-    try{ await api('/api/flats',{method:'POST',body:JSON.stringify({name:document.getElementById('f-name').value})}); showMsg('Flat created!','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
+    try{ await api('/api/groups',{method:'POST',body:JSON.stringify({name:document.getElementById('g-name').value})}); showMsg('Group created!','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
 }
 
-// ── Flat Detail ──
-async function flatDetailPage(fid,tab){
+// ── Group Detail ──
+async function groupDetailPage(fid,tab){
     tab=tab||'ledger';
     showChrome();
     const app=document.getElementById('app');
     app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
 
-    // Reuse cached flat data if switching tabs within the same flat
-    if(flatCache.flatId===fid && flatCache.flat && flatCache.members){
+    // Reuse cached group data if switching tabs within the same group
+    if(groupCache.groupId===fid && groupCache.group && groupCache.members){
         // Just re-render the tab content without re-fetching
         if(!document.getElementById('tab-content')){
             let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
-            h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(flatCache.flat.name)+'</h2></div>';
+            h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(groupCache.group.name)+'</h2></div>';
             h+='<div id="tab-content"></div>';
             app.innerHTML=h;
         }
@@ -212,10 +212,10 @@ async function flatDetailPage(fid,tab){
 
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
     try{
-        const [fd,md]=await Promise.all([api('/api/flats/'+fid),api('/api/flats/'+fid+'/members')]);
-        flatCache={flat:fd.flat,members:md.members,flatId:fid};
+        const [fd,md]=await Promise.all([api('/api/groups/'+fid),api('/api/groups/'+fid+'/members')]);
+        groupCache={group:fd.group,members:md.members,groupId:fid};
         let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
-        h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(fd.flat.name)+'</h2></div>';
+        h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(fd.group.name)+'</h2></div>';
         h+='<div id="tab-content"></div>';
         app.innerHTML=h;
         showFooter(fid,tab);
@@ -232,9 +232,9 @@ async function flatDetailPage(fid,tab){
 async function renderLedger(fid){
     const el=document.getElementById('tab-content');
     try{
-        const [bd]=await Promise.all([api('/api/flats/'+fid+'/balances')]);
+        const [bd]=await Promise.all([api('/api/groups/'+fid+'/balances')]);
         const transfers=bd.transfers||[];
-        const members=flatCache.members||[];
+        const members=groupCache.members||[];
 
         // Compute totals for current user
         let youOwe=0, youAreOwed=0;
@@ -257,13 +257,13 @@ async function renderLedger(fid){
 
         // Settlement CTA
         h+='<div class="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-brand to-brand-container text-white shadow-xl mt-4">';
-        h+='<div class="relative z-10 flex items-center justify-between"><div class="space-y-1"><h3 class="font-headline font-bold text-base">Record Settlement</h3><p class="text-[11px] opacity-90 max-w-[200px]">Paid back a flatmate? Keep the ledger balanced.</p></div>';
+        h+='<div class="relative z-10 flex items-center justify-between"><div class="space-y-1"><h3 class="font-headline font-bold text-base">Record Settlement</h3><p class="text-[11px] opacity-90 max-w-[200px]">Paid back a member? Keep the ledger balanced.</p></div>';
         h+='<button onclick="switchTab(\''+fid+'\',\'settlements\')" class="bg-surface-card text-brand px-3 py-2 rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-transform">Settle</button></div>';
         h+='<div class="absolute -right-10 -bottom-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div></div>';
 
-        // Flatmates horizontal scroll
+        // Members horizontal scroll
         if(members.length>0){
-            h+='<div class="space-y-3 mt-4"><div class="flex items-center justify-between"><h3 class="font-headline text-base font-bold tracking-tight">Flatmates</h3>';
+            h+='<div class="space-y-3 mt-4"><div class="flex items-center justify-between"><h3 class="font-headline text-base font-bold tracking-tight">Members</h3>';
             h+='<button onclick="switchTab(\''+fid+'\',\'members\')" class="text-brand text-xs font-medium">Manage</button></div>';
             h+='<div class="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5">';
             members.forEach(m=>{
@@ -327,7 +327,7 @@ async function loadActivity(fid){
     if(memberId) qs+='memberId='+memberId+'&';
 
     try{
-        const d=await api('/api/flats/'+fid+'/activity'+qs);
+        const d=await api('/api/groups/'+fid+'/activity'+qs);
         const items=d.activity||[];
         if(items.length===0){
             el.innerHTML='<p class="text-center text-on-surface-light text-xs py-6">No activity found</p>';
@@ -410,7 +410,7 @@ function updateSplitSummary(){
     if(!el) return;
     const amt=parseFloat(document.getElementById('e-amount')?.value)||0;
     const payerId=S.user.id;
-    const members=flatCache.members||[];
+    const members=groupCache.members||[];
     const sel=_splitState.selectedMembers;
 
     if(sel.length===0){
@@ -454,7 +454,7 @@ function toggleSplitMember(uid){
 }
 
 function selectAllSplitMembers(){
-    const members=flatCache.members||[];
+    const members=groupCache.members||[];
     _splitState.selectedMembers=members.map(m=>m.id);
     renderSplitMembers();
     updateSplitSummary();
@@ -463,7 +463,7 @@ function selectAllSplitMembers(){
 function renderSplitMembers(){
     const el=document.getElementById('split-members');
     if(!el) return;
-    const members=flatCache.members||[];
+    const members=groupCache.members||[];
     let h='';
     members.forEach(m=>{
         const sel=_splitState.selectedMembers.includes(m.id);
@@ -481,8 +481,8 @@ function renderSplitMembers(){
 async function renderExpenses(fid){
     const el=document.getElementById('tab-content');
     try{
-        const d=await api('/api/flats/'+fid+'/expenses');
-        const m=flatCache.members||[];
+        const d=await api('/api/groups/'+fid+'/expenses');
+        const m=groupCache.members||[];
         _splitState={selectedMembers:m.map(x=>x.id),payerId:S.user.id,amount:0,category:'other'};
 
         let h='';
@@ -576,14 +576,14 @@ async function submitExpense(fid){
     if(!amt||amt<=0){ showMsg('Enter a valid amount'); return; }
     if(_splitState.selectedMembers.length===0){ showMsg('Select at least one person to split with'); return; }
     try{
-        await api('/api/flats/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
+        await api('/api/groups/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
             description:desc,
             amount:amt,
             sharerIds:_splitState.selectedMembers,
             category:_splitState.category
         })});
         showMsg('Expense added!','success');
-        flatDetailPage(fid,'expenses');
+        groupDetailPage(fid,'expenses');
     }catch(err){ showMsg(err.message); }
 }
 
@@ -591,7 +591,7 @@ async function handleAddExpense(e,fid){ e.preventDefault(); submitExpense(fid); 
 
 async function deleteExpense(fid,eid){
     if(!confirm('Delete this expense?')) return;
-    try{ await api('/api/flats/'+fid+'/expenses/'+eid,{method:'DELETE'}); showMsg('Deleted','success'); flatDetailPage(fid,'expenses'); }catch(err){ showMsg(err.message); }
+    try{ await api('/api/groups/'+fid+'/expenses/'+eid,{method:'DELETE'}); showMsg('Deleted','success'); groupDetailPage(fid,'expenses'); }catch(err){ showMsg(err.message); }
 }
 
 let _receiptItems=[];
@@ -652,7 +652,7 @@ async function handleReceiptUpload(input){
             return;
         }
         // Each item gets its own sharers list (default: all members selected)
-        const allIds=(flatCache.members||[]).map(m=>m.id);
+        const allIds=(groupCache.members||[]).map(m=>m.id);
         _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other',sharers:[...allIds]}));
         renderReceiptTable();
         if(d.category && d.category!=='other') _splitState.category=d.category;
@@ -679,7 +679,7 @@ function renderReceiptTable(){
     if(!el) return;
     if(_receiptItems.length===0){ el.innerHTML=''; return; }
 
-    const members=flatCache.members||[];
+    const members=groupCache.members||[];
     let total=0;
     let h='<div class="bg-surface-card rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] overflow-hidden">';
 
@@ -736,8 +736,8 @@ function removeReceiptItem(idx){
 
 async function confirmReceiptItems(){
     if(_receiptItems.length===0) return;
-    const fid=flatCache.flatId;
-    if(!fid){ showMsg('No flat selected'); return; }
+    const fid=groupCache.groupId;
+    if(!fid){ showMsg('No group selected'); return; }
 
     // Group items by their sharer set (same sharers = same expense)
     const groups={};
@@ -754,7 +754,7 @@ async function confirmReceiptItems(){
     try{
         for(const g of groupList){
             const desc=g.items.map(it=>it.name+'('+it.price.toFixed(2)+')').join(', ');
-            await api('/api/flats/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
+            await api('/api/groups/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
                 description:desc,
                 amount:round2(g.total),
                 sharerIds:g.sharers,
@@ -769,7 +769,7 @@ async function confirmReceiptItems(){
         if(amtEl) amtEl.value='';
         if(descEl) descEl.value='';
         showMsg(submitted+' expense(s) added from receipt!','success');
-        flatDetailPage(fid,'expenses');
+        groupDetailPage(fid,'expenses');
     }catch(err){ showMsg(err.message); }
 }
 
@@ -781,7 +781,7 @@ let _settleState={debtorId:null,creditorId:null};
 function renderSettleMembers(containerId, selectedId, onClickFn){
     const el=document.getElementById(containerId);
     if(!el) return;
-    const members=flatCache.members||[];
+    const members=groupCache.members||[];
     let h='';
     members.forEach(m=>{
         const sel=m.id===selectedId;
@@ -807,8 +807,8 @@ function pickCreditor(uid){
 async function renderSettlements(fid){
     const el=document.getElementById('tab-content');
     try{
-        const [sd,bd]=await Promise.all([api('/api/flats/'+fid+'/settlements'),api('/api/flats/'+fid+'/balances')]);
-        const m=flatCache.members||[];
+        const [sd,bd]=await Promise.all([api('/api/groups/'+fid+'/settlements'),api('/api/groups/'+fid+'/balances')]);
+        const m=groupCache.members||[];
         const transfers=bd.transfers||[];
         _settleState={debtorId:null,creditorId:null};
 
@@ -840,7 +840,7 @@ async function renderSettlements(fid){
         // ── Record Settlement Section ──
         h+='<section class="mb-6">';
         h+='<h2 class="text-xl font-headline font-bold text-on-surface mb-1">Record Settlement</h2>';
-        h+='<p class="text-on-surface-light text-xs mb-5">Settle up with your flatmates.</p>';
+        h+='<p class="text-on-surface-light text-xs mb-5">Settle up with your members.</p>';
 
         h+='<div class="bg-surface-card p-5 rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-6">';
 
@@ -953,29 +953,29 @@ async function submitSettlement(fid){
     if(a===b){showMsg('Must be different people');return;}
     if(!amt||amt<=0){showMsg('Enter a valid amount');return;}
     try{
-        await api('/api/flats/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:a,creditorId:b,amount:amt})});
+        await api('/api/groups/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:a,creditorId:b,amount:amt})});
         showMsg('Settlement proposed!','success');
-        flatDetailPage(fid,'settlements');
+        groupDetailPage(fid,'settlements');
     }catch(err){ showMsg(err.message); }
 }
 
 async function quickSettle(fid,fromId,toId,amount){
     try{
-        await api('/api/flats/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:fromId,creditorId:toId,amount:amount})});
+        await api('/api/groups/'+fid+'/settlements',{method:'POST',body:JSON.stringify({debtorId:fromId,creditorId:toId,amount:amount})});
         showMsg('Settlement proposed!','success');
-        flatDetailPage(fid,'settlements');
+        groupDetailPage(fid,'settlements');
     }catch(err){ showMsg(err.message); }
 }
 
 async function handleSettle(e,fid){ e.preventDefault(); submitSettlement(fid); }
 
 async function confirmSettlement(fid,sid){
-    try{ await api('/api/flats/'+fid+'/settlements/'+sid+'/confirm',{method:'POST'}); showMsg('Confirmed!','success'); flatDetailPage(fid,'settlements'); }catch(err){ showMsg(err.message); }
+    try{ await api('/api/groups/'+fid+'/settlements/'+sid+'/confirm',{method:'POST'}); showMsg('Confirmed!','success'); groupDetailPage(fid,'settlements'); }catch(err){ showMsg(err.message); }
 }
 
 // ── Members Tab ──
 function renderMembers(fid){
-    const m=flatCache.members||[];
+    const m=groupCache.members||[];
     let h='<div class="space-y-2">';
     h+='<h3 class="font-headline text-sm font-bold">Members ('+m.length+')</h3>';
     m.forEach(x=>{
@@ -997,11 +997,11 @@ function renderMembers(fid){
 }
 async function handleAddMember(e,fid){
     e.preventDefault();
-    try{ await api('/api/flats/'+fid+'/members',{method:'POST',body:JSON.stringify({email:document.getElementById('add-email').value})}); showMsg('Added!','success'); flatDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
+    try{ await api('/api/groups/'+fid+'/members',{method:'POST',body:JSON.stringify({email:document.getElementById('add-email').value})}); showMsg('Added!','success'); groupDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
 }
 async function removeMember(fid,uid){
     if(!confirm('Remove this member?')) return;
-    try{ await api('/api/flats/'+fid+'/members/'+uid,{method:'DELETE'}); showMsg('Removed','success'); flatDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
+    try{ await api('/api/groups/'+fid+'/members/'+uid,{method:'DELETE'}); showMsg('Removed','success'); groupDetailPage(fid,'members'); }catch(err){ showMsg(err.message); }
 }
 
 // ── Router ──
@@ -1009,8 +1009,8 @@ function route(){
     const hash=location.hash.slice(1)||'';
     if(!S.token){ hideChrome(); return hash==='register'?registerPage():loginPage(); }
     if(hash==='dashboard'||hash==='') return dashboardPage();
-    if(hash==='new-flat') return newFlatPage();
-    if(hash.startsWith('flat/')) return flatDetailPage(hash.split('/')[1]);
+    if(hash==='new-group') return newGroupPage();
+    if(hash.startsWith('group/')) return groupDetailPage(hash.split('/')[1]);
     dashboardPage();
 }
 window.addEventListener('hashchange',route);

@@ -43,26 +43,26 @@ def init_db():
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         );
-        CREATE TABLE IF NOT EXISTS flats (
+        CREATE TABLE IF NOT EXISTS groups (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             created_by TEXT REFERENCES users(id),
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         );
-        CREATE TABLE IF NOT EXISTS flat_members (
+        CREATE TABLE IF NOT EXISTS group_members (
             id TEXT PRIMARY KEY,
-            flat_id TEXT REFERENCES flats(id) ON DELETE CASCADE,
+            group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
             user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
             joined_at TIMESTAMP DEFAULT NOW(),
-            UNIQUE(flat_id, user_id)
+            UNIQUE(group_id, user_id)
         );
         CREATE TABLE IF NOT EXISTS expenses (
             id TEXT PRIMARY KEY,
             amount NUMERIC(10,2) NOT NULL CHECK (amount > 0),
             description TEXT NOT NULL,
             payer_id TEXT REFERENCES users(id),
-            flat_id TEXT REFERENCES flats(id) ON DELETE CASCADE,
+            group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
             expense_type TEXT NOT NULL CHECK (expense_type IN ('shared', 'personal')),
             category TEXT DEFAULT 'other',
             timestamp TIMESTAMP NOT NULL,
@@ -78,7 +78,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS settlements (
             id TEXT PRIMARY KEY,
-            flat_id TEXT REFERENCES flats(id) ON DELETE CASCADE,
+            group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
             debtor_id TEXT REFERENCES users(id),
             creditor_id TEXT REFERENCES users(id),
             amount NUMERIC(10,2) NOT NULL,
@@ -96,7 +96,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS expense_durations (
             id TEXT PRIMARY KEY,
-            flat_id TEXT REFERENCES flats(id) ON DELETE CASCADE,
+            group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
             start_date TIMESTAMP NOT NULL,
             end_date TIMESTAMP,
             status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
