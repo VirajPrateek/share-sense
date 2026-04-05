@@ -14,25 +14,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="/static/style.css" rel="stylesheet">
     <script defer src="/_vercel/insights/script.js"></script>
     <script defer src="/_vercel/speed-insights/script.js"></script>
-    <script>
-    tailwind.config = {
-        theme: {
-            extend: {
-                colors: {
-                    brand: '#006A6A', 'brand-light': '#e0f2f1', 'brand-container': '#004f4f',
-                    surface: '#f6faf8', 'surface-low': '#f0f4f2', 'surface-card': '#ffffff',
-                    'on-surface': '#181d1c', 'on-surface-light': '#5c6767',
-                    danger: '#ba1a1a', 'danger-bg': 'rgba(186,26,26,0.08)',
-                    'success-bg': 'rgba(0,106,106,0.06)',
-                },
-                fontFamily: { headline: ['Manrope','sans-serif'], body: ['Inter','sans-serif'] },
-            }
-        }
-    }
-    </script>
     <style>
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
         .mso-fill { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
@@ -208,6 +192,24 @@ async function flatDetailPage(fid,tab){
     showChrome();
     const app=document.getElementById('app');
     app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+
+    // Reuse cached flat data if switching tabs within the same flat
+    if(flatCache.flatId===fid && flatCache.flat && flatCache.members){
+        // Just re-render the tab content without re-fetching
+        if(!document.getElementById('tab-content')){
+            let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
+            h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(flatCache.flat.name)+'</h2></div>';
+            h+='<div id="tab-content"></div>';
+            app.innerHTML=h;
+        }
+        showFooter(fid,tab);
+        if(tab==='ledger') renderLedger(fid);
+        else if(tab==='expenses') renderExpenses(fid);
+        else if(tab==='settlements') renderSettlements(fid);
+        else if(tab==='members') renderMembers(fid);
+        return;
+    }
+
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
     try{
         const [fd,md]=await Promise.all([api('/api/flats/'+fid),api('/api/flats/'+fid+'/members')]);
