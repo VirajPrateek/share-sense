@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sharesense-v1';
+const CACHE_NAME = 'sharesense-v2';
 const SHELL_URLS = ['/'];
 
 // Cache app shell on install
