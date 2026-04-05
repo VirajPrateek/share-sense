@@ -522,28 +522,46 @@ async function deleteExpense(fid,eid){
 
 let _receiptItems=[];
 
+// Resize image client-side before sending to Gemini (saves bandwidth + tokens)
+function resizeImage(dataUrl, maxWidth=1024){
+    return new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+            let w=img.width, h=img.height;
+            if(w<=maxWidth){ res(dataUrl); return; }
+            const scale=maxWidth/w;
+            w=maxWidth; h=Math.round(img.height*scale);
+            const c=document.createElement('canvas');
+            c.width=w; c.height=h;
+            c.getContext('2d').drawImage(img,0,0,w,h);
+            res(c.toDataURL('image/jpeg',0.85));
+        };
+        img.src=dataUrl;
+    });
+}
+
 async function handleReceiptUpload(input){
     const file=input.files&&input.files[0];
     if(!file) return;
     const status=document.getElementById('receipt-status');
-    if(status) status.textContent='Scanning receipt...';
+    if(status) status.textContent='Resizing & scanning...';
 
     try{
-        const b64=await new Promise((res,rej)=>{
+        let b64=await new Promise((res,rej)=>{
             const r=new FileReader();
             r.onload=()=>res(r.result);
             r.onerror=rej;
             r.readAsDataURL(file);
         });
-        const d=await api('/api/parse-receipt',{method:'POST',body:JSON.stringify({image:b64,mimeType:file.type||'image/jpeg'})});
+        // Resize to 1024px wide — keeps text readable, cuts size ~80%
+        b64=await resizeImage(b64, 1024);
+        const d=await api('/api/parse-receipt',{method:'POST',body:JSON.stringify({image:b64,mimeType:'image/jpeg'})});
         if(d.error&&d.items&&d.items.length===0){
             if(status) status.textContent=d.error;
             return;
         }
-        // Store parsed items and show editable table
         _receiptItems=(d.items||[]).map((it,i)=>({id:i,name:it.name||'',price:parseFloat(it.price)||0,category:it.category||'other'}));
         renderReceiptTable();
-        // Set AI-inferred category
         if(d.category && d.category!=='other') _splitState.category=d.category;
         if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — edit below then confirm</span>';
     }catch(err){
