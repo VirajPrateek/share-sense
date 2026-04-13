@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sharesense-v2';
+const CACHE_NAME = 'sharesense-v3';
 const SHELL_URLS = ['/'];
 
 // Cache app shell on install
@@ -31,8 +31,11 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request)
         .then(res => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          // Only cache successful responses, never cache errors (especially 401s)
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          }
           return res;
         })
         .catch(() => caches.match(e.request))

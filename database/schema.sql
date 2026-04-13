@@ -125,6 +125,19 @@ CREATE INDEX idx_expense_durations_start_date ON expense_durations(start_date);
 CREATE INDEX idx_expense_durations_end_date ON expense_durations(end_date);
 
 -- ============================================================================
+-- ROW-LEVEL SECURITY
+-- ============================================================================
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expense_shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settlement_confirmations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expense_durations ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
 -- TRIGGERS
 -- ============================================================================
 

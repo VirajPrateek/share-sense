@@ -68,7 +68,7 @@ let groupCache = {};
 
 function setAuth(t,u){ S.token=t; S.user=u; localStorage.setItem('ss_token',t); localStorage.setItem('ss_user',JSON.stringify(u)); }
 function clearAuth(){ S.token=null; S.user=null; localStorage.removeItem('ss_token'); localStorage.removeItem('ss_user'); }
-async function api(p,o={}){ const h={'Content-Type':'application/json'}; if(S.token) h['Authorization']='Bearer '+S.token; const r=await fetch(API+p,{...o,headers:h}); const d=await r.json(); if(!r.ok) throw new Error(d.error||d.message||'Failed'); return d; }
+async function api(p,o={}){ const h={'Content-Type':'application/json'}; if(S.token) h['Authorization']='Bearer '+S.token; const r=await fetch(API+p,{...o,headers:h}); const d=await r.json(); if(r.status===401){ clearAuth(); location.hash='#login'; route(); throw new Error('Session expired. Please log in again.'); } if(!r.ok) throw new Error(d.error||d.message||'Failed'); return d; }
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 async function logout(){ clearAuth(); hideChrome(); route(); }
 
