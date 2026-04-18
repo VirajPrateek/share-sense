@@ -48,9 +48,12 @@ def parse_receipt():
             '{"items": [{"name": "item name", "price": 12.50, "category": "groceries"}], "total": 99.99, "category": "groceries"}\n'
             "Rules:\n"
             "- price must be a number (not a string)\n"
-            "- total is the receipt total if visible, otherwise sum of item prices\n"
+            "- total is the final amount payable on the receipt (after all discounts and taxes)\n"
+            "- Include discounts/offers as separate items with NEGATIVE prices (e.g. {\"name\": \"Discount\", \"price\": -15.00, \"category\": \"other\"})\n"
+            "- Include taxes, delivery fees, platform fees, and surcharges as separate items with POSITIVE prices (e.g. {\"name\": \"GST\", \"price\": 8.50, \"category\": \"other\"})\n"
+            "- The sum of all item prices (including negative discounts) should equal the total\n"
             "- category for each item must be one of: groceries, rent, utilities, fun, food, transport, other\n"
-            "- top-level category should be the most common category among items\n"
+            "- top-level category should be the most common category among the actual product items (ignore fees/discounts for this)\n"
             "- If you cannot parse the receipt, return: {\"items\": [], \"total\": 0, \"error\": \"Could not parse receipt\"}"
         )
 
@@ -76,7 +79,7 @@ def parse_receipt():
         items = parsed.get("items", [])
         total = parsed.get("total", 0)
 
-        # Build description string: item1(₹val), item2(₹val)
+        # Build description string: item1(val), item2(-val for discounts)
         desc_parts = []
         computed_total = 0
         for item in items:
