@@ -12,6 +12,7 @@ import routes_groups
 import routes_expenses
 import routes_settlements
 import routes_receipt
+import routes_lists
 
 
 class _SafeJSON(DefaultJSONProvider):
@@ -40,6 +41,7 @@ def create_app():
     app.register_blueprint(routes_expenses.bp)
     app.register_blueprint(routes_settlements.bp)
     app.register_blueprint(routes_receipt.bp)
+    app.register_blueprint(routes_lists.bp)
 
     @app.route("/")
     def index():

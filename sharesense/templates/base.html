@@ -49,6 +49,9 @@
         <div class="p-6 space-y-3 border-t border-surface-low">
             <button onclick="logout()" class="w-full py-3 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2">
                 <span class="material-symbols-outlined text-[18px]">logout</span>Logout</button>
+            <div class="pt-3 text-center">
+                <a href="https://github.com/VirajPrateek" target="_blank" class="text-[10px] text-on-surface-light hover:text-brand transition-colors">github/virajprateek</a>
+            </div>
         </div>
     </div>
 </div>
@@ -83,6 +86,7 @@ function toggleMenu(){
     }
     let items='';
     if(S.groupId && groupCache.groupId===S.groupId){
+        items+='<button onclick="switchTab(\''+S.groupId+'\',\'settlements\');toggleMenu()" class="w-full py-3 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors rounded-lg hover:bg-brand-light px-3"><span class="material-symbols-outlined text-[18px]">handshake</span>Settlements</button>';
         items+='<button onclick="switchTab(\''+S.groupId+'\',\'members\');toggleMenu()" class="w-full py-3 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors rounded-lg hover:bg-brand-light px-3"><span class="material-symbols-outlined text-[18px]">group</span>Members & Settings</button>';
     }
     items+='<button onclick="toggleMenu();showJoinDialog()" class="w-full py-3 text-left text-xs font-medium flex items-center gap-3 text-on-surface hover:text-brand transition-colors rounded-lg hover:bg-brand-light px-3"><span class="material-symbols-outlined text-[18px]">login</span>Join Group by Code</button>';
@@ -95,7 +99,7 @@ function showFooter(groupId, tab, pendingSettlements){
     const tabs=[
         {id:'ledger',icon:'account_balance_wallet',label:'ledger'},
         {id:'expenses',icon:'receipt_long',label:'split'},
-        {id:'settlements',icon:'handshake',label:'settle'},
+        {id:'list',icon:'checklist',label:'list'},
     ];
     const inner=nav.querySelector('div');
     inner.innerHTML=tabs.map(t=>{
@@ -250,6 +254,7 @@ async function groupDetailPage(fid,tab){
         if(tab==='ledger') renderLedger(fid);
         else if(tab==='expenses') renderExpenses(fid);
         else if(tab==='settlements') renderSettlements(fid);
+        else if(tab==='list') renderList(fid);
         else if(tab==='members') renderMembers(fid);
         return;
     }
@@ -267,6 +272,7 @@ async function groupDetailPage(fid,tab){
         if(tab==='ledger') renderLedger(fid);
         else if(tab==='expenses') renderExpenses(fid);
         else if(tab==='settlements') renderSettlements(fid);
+        else if(tab==='list') renderList(fid);
         else if(tab==='members') renderMembers(fid);
     }catch(err){ showMsg(err.message); }
 }
@@ -1133,6 +1139,182 @@ async function archiveGroup(fid){
 async function deleteGroup(fid){
     if(!confirm('Permanently delete this group and all its data? This cannot be undone.')) return;
     try{ await api('/api/groups/'+fid,{method:'DELETE'}); showMsg('Group deleted','success'); location.hash='#dashboard'; }catch(err){ showMsg(err.message); }
+}
+
+// ── List Tab (offline-first shopping/to-do list) ──
+let _idb = null;
+
+async function getIDB(){
+    if(_idb) return _idb;
+    return new Promise((res,rej)=>{
+        const req=indexedDB.open('sharesense',1);
+        req.onupgradeneeded=e=>{
+            const db=e.target.result;
+            if(!db.objectStoreNames.contains('list_items')){
+                const s=db.createObjectStore('list_items',{keyPath:'id'});
+                s.createIndex('group_id','group_id',{unique:false});
+            }
+            if(!db.objectStoreNames.contains('pending_sync')){
+                db.createObjectStore('pending_sync',{keyPath:'id',autoIncrement:true});
+            }
+        };
+        req.onsuccess=e=>{ _idb=e.target.result; res(_idb); };
+        req.onerror=e=>rej(e.target.error);
+    });
+}
+
+async function idbGetItems(groupId){
+    const db=await getIDB();
+    return new Promise((res,rej)=>{
+        const tx=db.transaction('list_items','readonly');
+        const idx=tx.objectStore('list_items').index('group_id');
+        const req=idx.getAll(groupId);
+        req.onsuccess=()=>res(req.result);
+        req.onerror=()=>rej(req.error);
+    });
+}
+
+async function idbPutItem(item){
+    const db=await getIDB();
+    return new Promise((res,rej)=>{
+        const tx=db.transaction('list_items','readwrite');
+        const req=tx.objectStore('list_items').put(item);
+        req.onsuccess=()=>res();
+        req.onerror=()=>rej(req.error);
+    });
+}
+
+async function idbDeleteItem(id){
+    const db=await getIDB();
+    return new Promise((res,rej)=>{
+        const tx=db.transaction('list_items','readwrite');
+        const req=tx.objectStore('list_items').delete(id);
+        req.onsuccess=()=>res();
+        req.onerror=()=>rej(req.error);
+    });
+}
+
+async function renderList(fid){
+    const el=document.getElementById('tab-content');
+    el.innerHTML='<div class="text-center py-6 text-on-surface-light text-xs">Loading list...</div>';
+
+    // Load from IndexedDB first (instant, works offline)
+    let items=await idbGetItems(fid);
+    renderListUI(fid, items);
+
+    // Then try to sync with server
+    try{
+        const d=await api('/api/groups/'+fid+'/list');
+        const serverItems=d.items||[];
+        // Update IDB with server data
+        for(const it of serverItems) await idbPutItem({...it,group_id:fid});
+        renderListUI(fid, serverItems);
+    }catch(e){
+        // Offline — show cached data with indicator
+        const el2=document.getElementById('list-offline-note');
+        if(el2) el2.style.display='';
+    }
+}
+
+function renderListUI(fid, items){
+    const el=document.getElementById('tab-content');
+    const pending=items.filter(i=>!i.is_done);
+    const done=items.filter(i=>i.is_done);
+
+    let h='';
+
+    // Offline note (hidden by default)
+    h+='<div id="list-offline-note" class="hidden mb-3 px-3 py-2 bg-amber-50 rounded-lg text-[10px] text-amber-700 flex items-center gap-2"><span class="material-symbols-outlined text-[14px]">wifi_off</span>Offline — showing cached list</div>';
+
+    // Add item input
+    h+='<div class="flex gap-2 mb-5">';
+    h+='<input id="list-input" type="text" placeholder="Add item..." class="flex-1 px-4 py-3 rounded-xl bg-surface-card shadow-[0_2px_10px_rgba(24,29,28,0.03)] border-none text-sm focus:ring-2 focus:ring-brand/30" onkeydown="if(event.key===\'Enter\')addListItem(\''+fid+'\')">';
+    h+='<button onclick="addListItem(\''+fid+'\')" class="px-4 py-3 bg-brand text-white rounded-xl text-sm font-semibold active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">add</span></button>';
+    h+='</div>';
+
+    // Pending items
+    if(pending.length>0){
+        h+='<div class="space-y-2 mb-4">';
+        pending.forEach(it=>{
+            h+='<div class="flex items-center gap-3 p-3.5 bg-surface-card rounded-xl shadow-[0_2px_10px_rgba(24,29,28,0.02)]">';
+            h+='<button onclick="toggleListItem(\''+fid+'\',\''+it.id+'\')" class="w-5 h-5 rounded-full border-2 border-brand flex-shrink-0 hover:bg-brand-light transition-colors"></button>';
+            h+='<span class="flex-1 text-sm text-on-surface">'+esc(it.text)+'</span>';
+            h+='<button onclick="deleteListItem(\''+fid+'\',\''+it.id+'\')" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[14px]">close</span></button>';
+            h+='</div>';
+        });
+        h+='</div>';
+    } else {
+        h+='<p class="text-center text-on-surface-light text-xs py-6">Nothing on the list yet</p>';
+    }
+
+    // Done items (collapsed)
+    if(done.length>0){
+        h+='<details class="mt-2"><summary class="text-[11px] text-on-surface-light font-medium cursor-pointer select-none">Done ('+done.length+')</summary>';
+        h+='<div class="space-y-2 mt-2">';
+        done.forEach(it=>{
+            h+='<div class="flex items-center gap-3 p-3 bg-surface-low rounded-xl opacity-60">';
+            h+='<button onclick="toggleListItem(\''+fid+'\',\''+it.id+'\')" class="w-5 h-5 rounded-full bg-brand flex-shrink-0 flex items-center justify-center"><span class="material-symbols-outlined text-white text-[12px] mso-fill">check</span></button>';
+            h+='<span class="flex-1 text-xs text-on-surface-light line-through">'+esc(it.text)+'</span>';
+            h+='<button onclick="deleteListItem(\''+fid+'\',\''+it.id+'\')" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-danger-bg transition-colors"><span class="material-symbols-outlined text-danger text-[12px]">close</span></button>';
+            h+='</div>';
+        });
+        h+='</div></details>';
+    }
+
+    el.innerHTML=h;
+    // Focus input
+    setTimeout(()=>document.getElementById('list-input')?.focus(),100);
+}
+
+async function addListItem(fid){
+    const input=document.getElementById('list-input');
+    const text=(input?.value||'').trim();
+    if(!text) return;
+    input.value='';
+
+    const id=crypto.randomUUID();
+    const item={id,group_id:fid,text,is_done:false,created_by:S.user.id,created_by_name:S.user.name,created_at:new Date().toISOString()};
+
+    // Write to IDB immediately (offline-first)
+    await idbPutItem(item);
+    // Re-render from IDB
+    const items=await idbGetItems(fid);
+    renderListUI(fid,items);
+
+    // Try to sync to server
+    try{
+        await api('/api/groups/'+fid+'/list',{method:'POST',body:JSON.stringify({id,text})});
+    }catch(e){
+        // Queue for background sync when online
+        if('serviceWorker' in navigator && 'SyncManager' in window){
+            const reg=await navigator.serviceWorker.ready;
+            const db=await getIDB();
+            const tx=db.transaction('pending_sync','readwrite');
+            tx.objectStore('pending_sync').add({url:'/api/groups/'+fid+'/list',method:'POST',body:JSON.stringify({id,text}),token:S.token});
+            await reg.sync.register('sync-list-items');
+        }
+    }
+}
+
+async function toggleListItem(fid,id){
+    // Optimistic update in IDB
+    const db=await getIDB();
+    const tx=db.transaction('list_items','readwrite');
+    const store=tx.objectStore('list_items');
+    const item=await new Promise(r=>{ const req=store.get(id); req.onsuccess=()=>r(req.result); });
+    if(item){ item.is_done=!item.is_done; store.put(item); }
+    const items=await idbGetItems(fid);
+    renderListUI(fid,items);
+
+    // Sync to server
+    try{ await api('/api/groups/'+fid+'/list/'+id,{method:'PATCH'}); }catch(e){}
+}
+
+async function deleteListItem(fid,id){
+    await idbDeleteItem(id);
+    const items=await idbGetItems(fid);
+    renderListUI(fid,items);
+    try{ await api('/api/groups/'+fid+'/list/'+id,{method:'DELETE'}); }catch(e){}
 }
 
 // ── Router ──

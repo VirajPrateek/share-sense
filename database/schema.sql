@@ -97,6 +97,17 @@ CREATE TABLE expense_durations (
   closed_at TIMESTAMP
 );
 
+-- Shared list items (shopping lists, to-dos, chores)
+CREATE TABLE list_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  text VARCHAR(500) NOT NULL,
+  is_done BOOLEAN DEFAULT FALSE,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================================================
 -- INDEXES
 -- ============================================================================

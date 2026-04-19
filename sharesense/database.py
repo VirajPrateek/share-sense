@@ -105,6 +105,15 @@ def init_db():
             created_at TIMESTAMP DEFAULT NOW(),
             closed_at TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS list_items (
+            id TEXT PRIMARY KEY,
+            group_id TEXT REFERENCES groups(id) ON DELETE CASCADE,
+            text TEXT NOT NULL,
+            is_done BOOLEAN DEFAULT FALSE,
+            created_by TEXT REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        );
     """)
     conn.commit()
     conn.close()
