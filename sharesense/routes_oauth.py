@@ -7,6 +7,7 @@ Flow:
                                     redirect to frontend with token in fragment
 """
 
+import logging
 import uuid
 
 import requests
@@ -16,6 +17,8 @@ from flask import Blueprint, redirect, request
 import config
 from auth import create_token
 from database import get_db
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("oauth", __name__, url_prefix="/api/auth")
 
@@ -74,8 +77,9 @@ def google_callback():
             code=code,
             grant_type="authorization_code",
         )
-    except Exception:
-        return redirect("/#login?error=token_exchange_failed")
+    except Exception as e:
+        log.exception("OAuth token exchange failed")
+        return redirect(f"/#login?error=token_exchange_failed&detail={type(e).__name__}")
 
     # Fetch user profile from Google
     try:
@@ -86,8 +90,9 @@ def google_callback():
         )
         resp.raise_for_status()
         profile = resp.json()
-    except Exception:
-        return redirect("/#login?error=userinfo_failed")
+    except Exception as e:
+        log.exception("OAuth userinfo fetch failed")
+        return redirect(f"/#login?error=userinfo_failed&detail={type(e).__name__}")
 
     google_id = profile.get("sub")
     email     = profile.get("email", "").lower().strip()
@@ -99,10 +104,15 @@ def google_callback():
     db = get_db()
     try:
         # 1. Try to find an existing user by google_id
-        row = db.execute(
-            "SELECT id, email, name FROM users WHERE google_id = ?",
-            (google_id,),
-        ).fetchone()
+        try:
+            row = db.execute(
+                "SELECT id, email, name FROM users WHERE google_id = ?",
+                (google_id,),
+            ).fetchone()
+        except Exception:
+            # google_id column doesn't exist yet — migration 013 not run
+            log.warning("google_id column missing — run migration 013")
+            row = None
 
         if row:
             user_id = row["id"]
@@ -114,22 +124,39 @@ def google_callback():
             ).fetchone()
 
             if row:
-                # Link Google account to existing user
+                # Link Google account to existing user (best-effort — skip if column missing)
                 user_id = row["id"]
-                db.execute(
-                    "UPDATE users SET google_id = ?, auth_provider = 'google', updated_at = NOW() WHERE id = ?",
-                    (google_id, user_id),
-                )
-                db.commit()
+                try:
+                    db.execute(
+                        "UPDATE users SET google_id = ?, auth_provider = 'google', updated_at = NOW() WHERE id = ?",
+                        (google_id, user_id),
+                    )
+                    db.commit()
+                except Exception:
+                    db._conn.rollback()
+                    log.warning("Could not link google_id — migration 013 may not be applied")
             else:
                 # 3. Brand-new user — create account (no password)
                 user_id = str(uuid.uuid4())
-                db.execute(
-                    """INSERT INTO users (id, email, name, google_id, auth_provider)
-                       VALUES (?, ?, ?, ?, 'google')""",
-                    (user_id, email, name, google_id),
-                )
+                try:
+                    db.execute(
+                        """INSERT INTO users (id, email, name, google_id, auth_provider)
+                           VALUES (?, ?, ?, ?, 'google')""",
+                        (user_id, email, name, google_id),
+                    )
+                except Exception:
+                    # Fallback: insert without OAuth columns if migration not run
+                    db._conn.rollback()
+                    log.warning("Inserting user without google_id — migration 013 not applied")
+                    db.execute(
+                        "INSERT INTO users (id, email, name, password_hash, salt) VALUES (?, ?, ?, '', '')",
+                        (user_id, email, name),
+                    )
                 db.commit()
+    except Exception:
+        log.exception("DB error during OAuth user upsert")
+        db.close()
+        return redirect("/#login?error=db_error")
     finally:
         db.close()
 
