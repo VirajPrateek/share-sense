@@ -29,9 +29,28 @@
 </head>
 <body class="bg-surface text-on-surface font-body">
 
+<!-- Desktop Sidebar -->
+<aside id="desktop-sidebar" class="hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-surface-card border-r border-surface-low z-40" style="display:none">
+    <div class="p-6 pb-4">
+        <h1 class="font-headline text-xl font-extrabold text-brand lowercase tracking-tight">sharesense</h1>
+        <p class="text-[10px] text-on-surface-light mt-0.5">split expenses, stay in harmony</p>
+    </div>
+    <div class="px-3 flex-1 overflow-y-auto no-scrollbar">
+        <div id="sidebar-groups" class="space-y-1 mb-4"></div>
+        <div class="h-px bg-surface-low mx-3 my-3"></div>
+        <div id="sidebar-nav" class="space-y-1"></div>
+    </div>
+    <div class="p-4 border-t border-surface-low space-y-2">
+        <div id="sidebar-user" class="flex items-center gap-3 px-3 py-2"></div>
+        <button onclick="logout()" class="w-full py-2.5 rounded-xl bg-danger-bg text-danger text-xs font-semibold flex items-center justify-center gap-2 hover:bg-danger/10 transition-colors">
+            <span class="material-symbols-outlined text-[16px]">logout</span>Logout
+        </button>
+    </div>
+</aside>
+
 <!-- Top Bar -->
 <header id="topbar" class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-[0_4px_20px_rgba(24,29,28,0.04)]" style="display:none">
-    <div class="flex items-center justify-between px-5 h-14 max-w-lg mx-auto">
+    <div class="flex items-center justify-between px-5 h-14 max-w-lg mx-auto md:hidden">
         <button onclick="location.hash='#dashboard'" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors">
             <span class="material-symbols-outlined text-brand" id="topbar-left-icon">home_work</span>
         </button>
@@ -39,6 +58,15 @@
         <button onclick="toggleMenu()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors">
             <span class="material-symbols-outlined text-brand text-[20px]">menu</span>
         </button>
+    </div>
+    <!-- Desktop topbar: just a subtle header bar -->
+    <div class="hidden md:flex items-center justify-between h-14 md:ml-60 px-8">
+        <div id="desktop-page-title" class="font-headline text-sm font-bold text-on-surface"></div>
+        <div class="flex items-center gap-3">
+            <button onclick="showJoinDialog()" class="text-brand text-xs font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-brand-light transition-colors">
+                <span class="material-symbols-outlined text-[16px]">login</span>Join Group
+            </button>
+        </div>
     </div>
 </header>
 
@@ -59,10 +87,10 @@
 </div>
 
 <!-- Main Content -->
-<main id="app" class="pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6"></main>
+<main id="app" class="pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6 md:ml-60 md:max-w-4xl md:px-8 md:pb-8"></main>
 
-<!-- Bottom Nav -->
-<nav id="footer-nav" class="fixed bottom-0 w-full z-50 rounded-t-2xl bg-white/70 backdrop-blur-xl shadow-[0_-10px_40px_rgba(24,29,28,0.06)]" style="display:none">
+<!-- Bottom Nav (mobile only) -->
+<nav id="footer-nav" class="fixed bottom-0 w-full z-50 rounded-t-2xl bg-white/70 backdrop-blur-xl shadow-[0_-10px_40px_rgba(24,29,28,0.06)] md:hidden" style="display:none">
     <div class="flex justify-around items-center max-w-lg mx-auto px-4 pt-2 pb-3 h-[68px]"></div>
 </nav>
 
@@ -77,8 +105,61 @@ async function api(p,o={}){ const h={'Content-Type':'application/json'}; if(S.to
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 async function logout(){ clearAuth(); hideChrome(); route(); }
 
-function showChrome(){ document.getElementById('topbar').style.display=''; }
-function hideChrome(){ document.getElementById('topbar').style.display='none'; document.getElementById('footer-nav').style.display='none'; document.getElementById('side-menu').classList.add('hidden'); }
+function showChrome(){ document.getElementById('topbar').style.display=''; showDesktopSidebar(); }
+function hideChrome(){ document.getElementById('topbar').style.display='none'; document.getElementById('footer-nav').style.display='none'; document.getElementById('side-menu').classList.add('hidden'); hideDesktopSidebar(); }
+
+function showDesktopSidebar(){
+    const sb=document.getElementById('desktop-sidebar');
+    if(window.innerWidth>=768){ sb.style.display=''; sb.classList.remove('hidden'); }
+    updateSidebarUser();
+}
+function hideDesktopSidebar(){
+    const sb=document.getElementById('desktop-sidebar');
+    sb.style.display='none';
+}
+function updateSidebarUser(){
+    const el=document.getElementById('sidebar-user');
+    if(!el||!S.user) return;
+    el.innerHTML='<div class="w-8 h-8 rounded-full bg-brand-light flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-brand text-[16px]">person</span></div><div class="min-w-0"><p class="text-xs font-bold font-headline truncate">'+esc(S.user.name||'')+'</p><p class="text-[10px] text-on-surface-light truncate">'+esc(S.user.email||'')+'</p></div>';
+}
+function updateSidebarNav(groupId, tab){
+    const navEl=document.getElementById('sidebar-nav');
+    if(!navEl) return;
+    const tabs=[
+        {id:'ledger',icon:'account_balance_wallet',label:'Ledger'},
+        {id:'expenses',icon:'receipt_long',label:'Split Expense'},
+        {id:'list',icon:'checklist',label:'Shared List'},
+        {id:'settlements',icon:'handshake',label:'Settlements'},
+        {id:'members',icon:'group',label:'Members'},
+    ];
+    if(!groupId){ navEl.innerHTML=''; return; }
+    navEl.innerHTML=tabs.map(t=>{
+        const active=t.id===tab;
+        const cls=active?'bg-brand-light text-brand':'text-on-surface-light hover:text-brand hover:bg-surface-low';
+        const fill=active?'mso-fill':'';
+        return '<button onclick="switchTab(\''+groupId+'\',\''+t.id+'\')" class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 transition-all '+cls+'"><span class="material-symbols-outlined text-[18px] '+fill+'">'+t.icon+'</span>'+t.label+'</button>';
+    }).join('');
+}
+async function updateSidebarGroups(){
+    const el=document.getElementById('sidebar-groups');
+    if(!el) return;
+    try{
+        const d=await api('/api/groups');
+        if(!d.groups||d.groups.length===0){
+            el.innerHTML='<p class="text-[10px] text-on-surface-light px-3 py-2">No groups yet</p>';
+            return;
+        }
+        el.innerHTML='<p class="text-[10px] font-bold text-on-surface-light uppercase tracking-wider px-3 mb-1">Groups</p>'+d.groups.map(g=>{
+            const active=S.groupId===g.id;
+            const cls=active?'bg-brand-light text-brand':'text-on-surface hover:bg-surface-low';
+            return '<a href="#group/'+g.id+'" class="block px-3 py-2.5 rounded-xl text-xs font-semibold truncate transition-all '+cls+'"><span class="material-symbols-outlined text-[16px] align-middle mr-2">apartment</span>'+esc(g.name)+'</a>';
+        }).join('');
+    }catch(e){}
+}
+function updateDesktopTitle(title){
+    const el=document.getElementById('desktop-page-title');
+    if(el) el.textContent=title||'';
+}
 
 function toggleMenu(){
     const m=document.getElementById('side-menu');
@@ -112,6 +193,8 @@ function showFooter(groupId, tab, pendingSettlements){
         return '<a class="relative flex flex-col items-center justify-center '+cls+' active:scale-90 transition-transform duration-150 cursor-pointer" onclick="switchTab(\''+groupId+'\',\''+t.id+'\')">'+badge+'<span class="material-symbols-outlined '+fill+'">'+t.icon+'</span><span class="font-body text-[10px] font-medium tracking-wide">'+t.label+'</span></a>';
     }).join('');
     nav.style.display='';
+    // Update desktop sidebar nav
+    updateSidebarNav(groupId, tab);
 }
 
 function showMsg(text, type='error'){
@@ -218,8 +301,9 @@ async function handleRegister(e){
 async function dashboardPage(){
     showChrome(); document.getElementById('footer-nav').style.display='none';
     S.groupId=null; groupCache={};
+    updateSidebarNav(null); updateSidebarGroups(); updateDesktopTitle('My Groups');
     const app=document.getElementById('app');
-    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6 md:ml-60 md:max-w-4xl md:px-8 md:pb-8';
     app.innerHTML='<div class="text-center py-10 text-on-surface-light text-xs">Loading...</div>';
     try{
         const d=await api('/api/groups');
@@ -229,12 +313,14 @@ async function dashboardPage(){
         if(d.groups.length===0){
             h+='<div class="bg-surface-card rounded-2xl p-8 shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center"><span class="material-symbols-outlined text-4xl text-on-surface-light mb-2">home_work</span><p class="text-on-surface-light text-xs">No groups yet. Create one!</p></div>';
         } else {
+            h+='<div class="md:grid md:grid-cols-2 md:gap-4 space-y-3 md:space-y-0">';
             d.groups.forEach(f=>{
-                h+='<a href="#group/'+f.id+'" class="block bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] active:scale-[0.98] transition-transform">';
+                h+='<a href="#group/'+f.id+'" class="block bg-surface-card rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,29,28,0.04)] active:scale-[0.98] transition-transform hover:shadow-md">';
                 h+='<div class="flex items-center gap-4"><div class="w-11 h-11 rounded-xl bg-brand-light flex items-center justify-center"><span class="material-symbols-outlined text-brand">apartment</span></div>';
                 h+='<div class="flex-1"><p class="font-headline text-sm font-bold">'+esc(f.name)+'</p><p class="text-on-surface-light text-[11px]">Joined '+new Date(f.created_at).toLocaleDateString()+'</p></div>';
                 h+='<span class="material-symbols-outlined text-on-surface-light text-[20px]">chevron_right</span></div></a>';
             });
+            h+='</div>';
         }
         h+='</section>';
         app.innerHTML=h;
@@ -243,8 +329,9 @@ async function dashboardPage(){
 
 function newGroupPage(){
     showChrome(); document.getElementById('footer-nav').style.display='none';
+    updateDesktopTitle('Create New Group');
     const app=document.getElementById('app');
-    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6 md:ml-60 md:max-w-4xl md:px-8 md:pb-8';
     app.innerHTML=`
         <div class="bg-surface-card rounded-2xl p-6 shadow-[0_4px_20px_rgba(24,29,28,0.04)] space-y-4">
             <h2 class="font-headline text-lg font-bold">Create New Group</h2>
@@ -273,17 +360,19 @@ async function groupDetailPage(fid,tab){
     tab=tab||'ledger';
     showChrome();
     const app=document.getElementById('app');
-    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6';
+    app.className='pt-16 pb-24 px-5 max-w-lg mx-auto space-y-6 md:ml-60 md:max-w-4xl md:px-8 md:pb-8';
+    updateSidebarGroups();
 
     // Reuse cached group data if switching tabs within the same group
     if(groupCache.groupId===fid && groupCache.group && groupCache.members){
         // Just re-render the tab content without re-fetching
         if(!document.getElementById('tab-content')){
-            let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
+            let h='<div class="flex items-center gap-3 mb-2 md:hidden"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
             h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(groupCache.group.name)+'</h2></div>';
             h+='<div id="tab-content"></div>';
             app.innerHTML=h;
         }
+        updateDesktopTitle(groupCache.group.name);
         showFooter(fid,tab,groupCache.pendingSettlements||0);
         if(tab==='ledger') renderLedger(fid);
         else if(tab==='expenses') renderExpenses(fid);
@@ -298,10 +387,11 @@ async function groupDetailPage(fid,tab){
         // Fetch group, members, and balances all in parallel
         const [fd,md,bd,sd]=await Promise.all([api('/api/groups/'+fid),api('/api/groups/'+fid+'/members'),api('/api/groups/'+fid+'/balances'),api('/api/groups/'+fid+'/settlements')]);
         groupCache={group:fd.group,members:md.members,groupId:fid,balances:bd,pendingSettlements:sd.pendingForMe||0};
-        let h='<div class="flex items-center gap-3 mb-2"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
+        let h='<div class="flex items-center gap-3 mb-2 md:hidden"><a href="#dashboard" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-light transition-colors"><span class="material-symbols-outlined text-brand text-[20px]">arrow_back</span></a>';
         h+='<h2 class="font-headline text-lg font-bold tracking-tight">'+esc(fd.group.name)+'</h2></div>';
         h+='<div id="tab-content"></div>';
         app.innerHTML=h;
+        updateDesktopTitle(fd.group.name);
         showFooter(fid,tab,groupCache.pendingSettlements||0);
         if(tab==='ledger') renderLedger(fid);
         else if(tab==='expenses') renderExpenses(fid);
@@ -332,12 +422,12 @@ async function renderLedger(fid){
         const net=youAreOwed-youOwe;
 
         let h='';
-        // Bento balance cards
-        h+='<div class="grid grid-cols-2 gap-3">';
-        h+='<div class="col-span-2 p-6 rounded-2xl bg-surface-card shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center">';
-        h+='<p class="text-on-surface-light text-[11px] mb-1">Total Net Balance</p>';
+        // Bento balance cards — wider grid on desktop
+        h+='<div class="grid grid-cols-2 md:grid-cols-4 gap-3">';
+        h+='<div class="col-span-2 p-6 rounded-2xl bg-surface-card shadow-[0_4px_20px_rgba(24,29,28,0.04)] text-center md:text-left md:flex md:items-center md:justify-between">';
+        h+='<div><p class="text-on-surface-light text-[11px] mb-1">Total Net Balance</p>';
         const netCls=net>=0?'text-brand':'text-danger';
-        h+='<h2 class="font-headline font-extrabold text-3xl '+netCls+' tracking-tight">'+(net>=0?'+':'-')+CUR+Math.abs(net).toFixed(2)+'</h2></div>';
+        h+='<h2 class="font-headline font-extrabold text-3xl '+netCls+' tracking-tight">'+(net>=0?'+':'-')+CUR+Math.abs(net).toFixed(2)+'</h2></div></div>';
         h+='<div class="p-4 rounded-2xl bg-success-bg"><p class="text-[10px] text-brand mb-1">You are owed</p><p class="font-headline font-bold text-xl text-brand">'+CUR+youAreOwed.toFixed(2)+'</p></div>';
         h+='<div class="p-4 rounded-2xl bg-danger-bg"><p class="text-[10px] text-danger mb-1">You owe</p><p class="font-headline font-bold text-xl text-danger">'+CUR+youOwe.toFixed(2)+'</p></div>';
         h+='</div>';
@@ -1388,6 +1478,14 @@ route();
 if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
 }
+
+// Handle responsive sidebar on resize
+window.addEventListener('resize', ()=>{
+    if(S.token){
+        if(window.innerWidth>=768) showDesktopSidebar();
+        else hideDesktopSidebar();
+    }
+});
 
 // ── PWA Install Prompt ──
 let _installPrompt = null;
