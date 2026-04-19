@@ -23,8 +23,8 @@ Thumbs.db
 *.swp
 *.swo
 
-# Kiro settings (may contain secrets)
-.kiro/settings/
+# Kiro
+.kiro/
 
 # Test coverage
 coverage/
