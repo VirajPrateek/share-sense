@@ -88,21 +88,35 @@ def parse_receipt():
         items = parsed.get("items", [])
         total = parsed.get("total", 0)
 
-        # Build description string: item1(val), item2(-val for discounts)
-        desc_parts = []
+        # ── Post-processing validation ──
+        # If the sum of items doesn't match the stated total, flag it.
+        # This catches the common case where AI used original prices instead of discounted.
         computed_total = 0
         for item in items:
+            item["price"] = round(float(item.get("price", 0)), 2)
+            computed_total += item["price"]
+        computed_total = round(computed_total, 2)
+
+        total = round(float(total), 2) if total else 0
+        mismatch = False
+        mismatch_amount = 0
+
+        if total > 0 and abs(computed_total - total) > 1.0:
+            # Items don't add up to the total — likely used wrong prices.
+            # Flag it so the frontend can warn the user.
+            mismatch = True
+            mismatch_amount = round(computed_total - total, 2)
+
+        # Use receipt total as the source of truth
+        final_total = total if total > 0 else computed_total
+
+        # Build description string
+        desc_parts = []
+        for item in items:
             name = str(item.get("name", "")).strip()
-            price = float(item.get("price", 0))
-            computed_total += price
+            price = item["price"]
             if name:
                 desc_parts.append(f"{name}({price:.2f})")
-
-        # Use receipt total if available, otherwise computed
-        if total and float(total) > 0:
-            final_total = round(float(total), 2)
-        else:
-            final_total = round(computed_total, 2)
 
         return jsonify({
             "items": items,
@@ -110,6 +124,9 @@ def parse_receipt():
             "description": ", ".join(desc_parts),
             "category": parsed.get("category", "other"),
             "error": parsed.get("error"),
+            "mismatch": mismatch,
+            "mismatchAmount": mismatch_amount,
+            "hint": "Item prices may not match the bill total. Please verify individual prices." if mismatch else None,
         }), 200
 
     except json.JSONDecodeError:

@@ -823,7 +823,12 @@ async function handleReceiptUpload(input){
         // Hide manual entry sections — receipt handles splits at item level
         const manualSections=document.getElementById('manual-entry-sections');
         if(manualSections) manualSections.style.display='none';
-        if(status) status.innerHTML='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — assign splits then confirm</span>';
+        // Show mismatch warning if AI prices don't add up to bill total
+        let statusMsg='<span class="text-brand">Parsed '+_receiptItems.length+' item(s) — assign splits then confirm</span>';
+        if(d.mismatch){
+            statusMsg='<span class="text-danger">⚠ Item prices may not match the bill total (off by ₹'+Math.abs(d.mismatchAmount).toFixed(2)+'). Please verify prices.</span>';
+        }
+        if(status) status.innerHTML=statusMsg;
     }catch(err){
         hideScanOverlay();
         if(status) status.textContent=err.message||'Failed to scan receipt';
