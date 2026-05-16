@@ -96,6 +96,7 @@
 
 <script>
 const API = '', CUR = '₹';
+const _isDev = location.hostname==='localhost'||location.hostname==='127.0.0.1';
 const S = { token: localStorage.getItem('ss_token'), user: JSON.parse(localStorage.getItem('ss_user')||'null'), groupId: null, tab: 'ledger' };
 let groupCache = {};
 
@@ -463,6 +464,12 @@ async function renderLedger(fid){
         h+='<div class="flex items-center justify-between"><h3 class="font-headline text-base font-bold tracking-tight">Activity</h3>';
         h+='<button onclick="document.getElementById(\'activity-filters\').classList.toggle(\'hidden\')" class="text-brand text-xs font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">filter_list</span>Filter</button></div>';
 
+        // Search bar
+        h+='<div class="relative">';
+        h+='<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-light text-[16px]">search</span>';
+        h+='<input type="text" id="activity-search" placeholder="Search expenses..." oninput="filterActivityList()" class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-card border-none text-xs focus:ring-2 focus:ring-brand/30 shadow-[0_2px_10px_rgba(24,29,28,0.03)]">';
+        h+='</div>';
+
         // Filter controls (hidden by default)
         h+='<div id="activity-filters" class="hidden bg-surface-card rounded-xl p-4 shadow-[0_2px_10px_rgba(24,29,28,0.03)] space-y-3">';
         h+='<div class="grid grid-cols-2 gap-2">';
@@ -554,6 +561,29 @@ async function loadActivity(fid){
         });
         el.innerHTML=h;
     }catch(err){ el.innerHTML='<p class="text-center text-on-surface-light text-xs py-4">Error loading activity</p>'; }
+}
+
+function filterActivityList(){
+    const q=(document.getElementById('activity-search')?.value||'').toLowerCase().trim();
+    const el=document.getElementById('activity-list');
+    if(!el) return;
+    const cards=el.querySelectorAll('.bg-surface-card');
+    const separators=el.querySelectorAll('.flex.items-center.gap-3.mt-3');
+    // Show/hide cards based on search
+    cards.forEach(card=>{
+        const text=card.textContent.toLowerCase();
+        card.style.display=(!q||text.includes(q))?'':'none';
+    });
+    // Hide date separators if all cards below them are hidden
+    separators.forEach(sep=>{
+        let next=sep.nextElementSibling;
+        let anyVisible=false;
+        while(next && !next.classList.contains('mt-3')){
+            if(next.classList.contains('bg-surface-card') && next.style.display!=='none') anyVisible=true;
+            next=next.nextElementSibling;
+        }
+        sep.style.display=anyVisible?'':'none';
+    });
 }
 </script>
 
@@ -1537,6 +1567,12 @@ function route(){
 }
 window.addEventListener('hashchange',route);
 route();
+if(_isDev){
+    const db=document.createElement('div');
+    db.className='fixed top-0 left-0 right-0 z-[999] bg-amber-400 text-amber-900 text-[10px] font-bold text-center py-0.5 pointer-events-none';
+    db.textContent='⚠ DEV — connected to production database';
+    document.body.appendChild(db);
+}
 </script>
 <script>
 if('serviceWorker' in navigator){
