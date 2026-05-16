@@ -935,53 +935,80 @@ function reviewReceiptSplit(){
     });
     const groupList=Object.values(groups);
 
+    // ── Build per-person breakdown ──
+    // For each member, calculate what items they're responsible for and their share
+    const personBreakdown={};
+    members.forEach(m=>{ personBreakdown[m.id]={name:m.name,items:[],total:0}; });
+
+    _receiptItems.forEach(it=>{
+        const perPerson=round2(it.price/it.sharers.length);
+        it.sharers.forEach(id=>{
+            if(personBreakdown[id]){
+                personBreakdown[id].items.push({name:it.name,fullPrice:it.price,share:perPerson,sharedWith:it.sharers.length});
+                personBreakdown[id].total+=perPerson;
+            }
+        });
+    });
+
     // Replace the receipt-table content with the review summary
     const el=document.getElementById('receipt-table');
-    let grandTotal=0;
+    const grandTotal=_receiptItems.reduce((s,it)=>s+it.price,0);
     let h='<div class="bg-surface-card rounded-2xl shadow-[0_4px_20px_rgba(24,29,28,0.04)] overflow-hidden">';
 
     // Header
     h+='<div class="px-5 py-3 bg-brand-light/50">';
     h+='<div class="flex items-center gap-2"><span class="material-symbols-outlined text-brand text-[18px]">fact_check</span>';
-    h+='<span class="font-headline font-bold text-xs text-brand">Split Summary ('+groupList.length+' expense'+(groupList.length>1?'s':'')+')</span></div>';
+    h+='<span class="font-headline font-bold text-xs text-brand">Who Pays What</span></div>';
     h+='</div>';
 
-    groupList.forEach((g,gi)=>{
-        grandTotal+=g.total;
-        const sharerNames=g.sharers.map(id=>id===S.user.id?'You':(memberMap[id]||'?'));
-        const perPerson=g.total/g.sharers.length;
-        const payerInSplit=g.sharers.includes(S.user.id);
+    // Per-person sections
+    const personIds=Object.keys(personBreakdown).filter(id=>personBreakdown[id].items.length>0);
+    personIds.forEach((id,pi)=>{
+        const p=personBreakdown[id];
+        const isYou=id===S.user.id;
+        const displayName=isYou?'You (paying)':p.name;
+        const owesYou=!isYou;
 
-        h+='<div class="px-5 py-4'+(gi>0?' border-t border-surface-low':'')+'">';
+        h+='<div class="px-5 py-4'+(pi>0?' border-t border-surface-low':'')+'">';
 
-        // Items in this group
-        h+='<p class="text-[10px] text-on-surface-light mb-1">Items:</p>';
-        g.items.forEach(it=>{
-            h+='<div class="flex justify-between text-xs"><span class="text-on-surface">'+esc(it.name)+'</span><span class="font-bold">'+CUR+it.price.toFixed(2)+'</span></div>';
-        });
-
-        // Total for this group
-        h+='<div class="flex justify-between text-xs font-bold mt-2 pt-2 border-t border-surface-low"><span>Subtotal</span><span class="text-brand">'+CUR+round2(g.total).toFixed(2)+'</span></div>';
-
-        // Split info
-        h+='<div class="mt-2 p-2.5 bg-surface-low rounded-lg">';
-        h+='<p class="text-[10px] text-on-surface-light mb-1">Split between: '+sharerNames.join(', ')+'</p>';
-        g.sharers.forEach(id=>{
-            if(id===S.user.id) return;
-            const name=memberMap[id]||'?';
-            h+='<div class="flex justify-between text-[11px]"><span>'+esc(name)+' owes</span><span class="font-bold text-brand">'+CUR+round2(perPerson).toFixed(2)+'</span></div>';
-        });
-        if(!payerInSplit){
-            h+='<p class="text-[10px] text-on-surface-light mt-1">Full amount owed back to you</p>';
-        }
+        // Person header
+        h+='<div class="flex items-center gap-2 mb-2">';
+        h+='<div class="w-7 h-7 rounded-full '+(isYou?'bg-brand text-white':'bg-brand-light text-brand')+' flex items-center justify-center"><span class="material-symbols-outlined text-[14px]">person</span></div>';
+        h+='<span class="font-headline font-bold text-sm">'+esc(displayName)+'</span>';
+        h+='<span class="ml-auto font-headline font-bold text-sm '+(owesYou?'text-brand':'text-on-surface')+'">'+CUR+round2(p.total).toFixed(2)+'</span>';
         h+='</div>';
+
+        // Item breakdown for this person
+        h+='<div class="ml-9 space-y-1">';
+        p.items.forEach(it=>{
+            const shared=it.sharedWith>1?' (÷'+it.sharedWith+')':'';
+            h+='<div class="flex justify-between text-[11px] text-on-surface-light">';
+            h+='<span>'+esc(it.name)+shared+'</span>';
+            h+='<span class="font-medium text-on-surface">'+CUR+round2(it.share).toFixed(2)+'</span>';
+            h+='</div>';
+        });
+        h+='</div>';
+
+        // Owes summary
+        if(owesYou){
+            h+='<div class="ml-9 mt-2 px-2.5 py-1.5 bg-brand-light/50 rounded-lg">';
+            h+='<p class="text-[10px] font-semibold text-brand">'+esc(p.name)+' owes you '+CUR+round2(p.total).toFixed(2)+'</p>';
+            h+='</div>';
+        }
 
         h+='</div>';
     });
 
-    // Grand total
-    h+='<div class="px-5 py-3 bg-surface-low">';
-    h+='<div class="flex justify-between font-headline font-bold"><span>Grand Total</span><span class="text-brand text-lg">'+CUR+round2(grandTotal).toFixed(2)+'</span></div>';
+    // Grand total + your net cost
+    const yourTotal=personBreakdown[S.user.id]?personBreakdown[S.user.id].total:0;
+    const othersOweYou=round2(grandTotal-yourTotal);
+
+    h+='<div class="px-5 py-3 bg-surface-low space-y-1">';
+    h+='<div class="flex justify-between font-headline font-bold"><span>Bill Total</span><span class="text-on-surface text-lg">'+CUR+round2(grandTotal).toFixed(2)+'</span></div>';
+    h+='<div class="flex justify-between text-xs text-on-surface-light"><span>Your share</span><span class="font-semibold text-on-surface">'+CUR+round2(yourTotal).toFixed(2)+'</span></div>';
+    if(othersOweYou>0){
+        h+='<div class="flex justify-between text-xs"><span class="text-brand font-semibold">Others owe you</span><span class="font-bold text-brand">'+CUR+round2(othersOweYou).toFixed(2)+'</span></div>';
+    }
     h+='</div>';
 
     h+='</div>';
@@ -1010,7 +1037,39 @@ async function submitReceiptExpenses(){
         groups[key].total+=it.price;
     });
 
-    const groupList=Object.values(groups);
+    let groupList=Object.values(groups);
+
+    // ── Handle negative-total groups (coupons/discounts exceeding fees) ──
+    // Distribute their negative amount proportionally across positive groups.
+    const negGroups=groupList.filter(g=>g.total<=0);
+    const posGroups=groupList.filter(g=>g.total>0);
+
+    if(negGroups.length>0 && posGroups.length>0){
+        const totalNeg=negGroups.reduce((s,g)=>s+g.total,0); // negative number
+        const totalPos=posGroups.reduce((s,g)=>s+g.total,0);
+        // Distribute the discount proportionally across positive groups
+        posGroups.forEach(g=>{
+            const share=(g.total/totalPos)*totalNeg; // negative
+            g.total=round2(g.total+share);
+            // Add a note to description
+            g.items.push({name:'Discount (distributed)',price:round2(share),category:'other'});
+        });
+        // Remove the negative groups — their value is now absorbed
+        groupList=posGroups;
+    } else if(negGroups.length>0 && posGroups.length===0){
+        // All groups are negative or zero — shouldn't happen, but handle gracefully
+        showMsg('Total is zero or negative — nothing to log');
+        return;
+    }
+
+    // Filter out any groups that ended up at zero after distribution
+    groupList=groupList.filter(g=>g.total>0);
+
+    if(groupList.length===0){
+        showMsg('No expenses to add (total is zero)');
+        return;
+    }
+
     let submitted=0;
 
     try{
