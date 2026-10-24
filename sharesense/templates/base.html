@@ -769,6 +769,8 @@ async function submitExpense(fid){
     if(!desc){ showMsg('Please add a description'); return; }
     if(!amt||amt<=0){ showMsg('Enter a valid amount'); return; }
     if(_splitState.selectedMembers.length===0){ showMsg('Select at least one person to split with'); return; }
+    const btn=document.getElementById('manual-submit-btn');
+    if(btn){ if(btn.disabled) return; btn.disabled=true; }  // guard against double-submit while POST is in flight
     try{
         await api('/api/groups/'+fid+'/expenses',{method:'POST',body:JSON.stringify({
             description:desc,
@@ -778,7 +780,7 @@ async function submitExpense(fid){
         })});
         showMsg('Expense added!','success');
         groupDetailPage(fid,'expenses');
-    }catch(err){ showMsg(err.message); }
+    }catch(err){ if(btn) btn.disabled=false; showMsg(err.message); }
 }
 
 async function handleAddExpense(e,fid){ e.preventDefault(); submitExpense(fid); }
@@ -1054,7 +1056,9 @@ function reviewReceiptSplit(){
     el.innerHTML=h;
 }
 
+let _receiptSubmitting=false;
 async function submitReceiptExpenses(){
+    if(_receiptSubmitting) return;  // guard against double-submit while the POST loop is in flight
     if(_receiptItems.length===0) return;
     const fid=groupCache.groupId;
     if(!fid){ showMsg('No group selected'); return; }
@@ -1101,6 +1105,7 @@ async function submitReceiptExpenses(){
     }
 
     let submitted=0;
+    _receiptSubmitting=true;
 
     try{
         for(const g of groupList){
@@ -1122,6 +1127,7 @@ async function submitReceiptExpenses(){
         showMsg(submitted+' expense(s) added from receipt!','success');
         groupCache={}; groupDetailPage(fid,'expenses');
     }catch(err){ showMsg(err.message); }
+    finally{ _receiptSubmitting=false; }
 }
 
 function round2(n){ return Math.round(n*100)/100; }
